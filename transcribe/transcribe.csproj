@@ -9,6 +9,9 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <TrimmerRootAssembly>Whisper.net</TrimmerRootAssembly>
     <NoWarn>$(NoWarn);IL3000</NoWarn>
+    <EnableComHosting>true</EnableComHosting>
+    <EnableGeneratedComInterfaceComImportInterop>true</EnableGeneratedComInterfaceComImportInterop>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -20,6 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="Whisper.net.AllRuntimes" Version="1.9.0" />
   </ItemGroup>

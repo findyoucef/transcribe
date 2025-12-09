@@ -12,14 +12,8 @@ namespace Transcribe
 {
     public class WhisperClient
     {
-        public static async Task TranscribeAudioAsync(string wavFileName, IProgress<int>? progress = null, string model = "LargeV3", string language = "en")
+        public static async Task<string> EnsureModelDownloaded(string model)
         {
-            var txtFile = $"{Path.GetFileNameWithoutExtension(wavFileName)}.txt";
-            if (File.Exists(txtFile))
-            {
-                throw new InvalidOperationException($"Transcript already exists: {txtFile}");
-            }
-
             // Determine ggml type and model file name from the provided model option
             GgmlType ggmlType;
             string modelFileName;
@@ -53,6 +47,19 @@ namespace Transcribe
             {
                 await DownloadModel(modelPath, ggmlType);
             }
+
+            return modelPath;
+        }
+
+        public static async Task TranscribeAudioAsync(string wavFileName, IProgress<int>? progress = null, string model = "LargeV3", string language = "en")
+        {
+            var txtFile = $"{Path.GetFileNameWithoutExtension(wavFileName)}.txt";
+            if (File.Exists(txtFile))
+            {
+                throw new InvalidOperationException($"Transcript already exists: {txtFile}");
+            }
+
+            var modelPath = await EnsureModelDownloaded(model);
 
             // Create factory from selected model in the binary directory
             using var whisperFactory = WhisperFactory.FromPath(modelPath);
