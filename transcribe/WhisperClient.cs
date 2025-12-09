@@ -101,7 +101,7 @@ namespace Transcribe
                 using var fs = File.OpenRead(wavPath);
                 if (fs.Length < 44) return 0;
                 Span<byte> header = stackalloc byte[44];
-                fs.Read(header);
+                fs.ReadExactly(header);
                 int byteRate = BitConverter.ToInt32(header.Slice(28, 4));
                 int dataSize = BitConverter.ToInt32(header.Slice(40, 4));
                 if (byteRate <= 0 || dataSize <= 0) return 0;
