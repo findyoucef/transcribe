@@ -17,8 +17,8 @@ namespace Transcribe
 
             var modelOption = new Option<string>(
                 name: "--model",
-                description: "Whisper model to use: LargeV3 (default), LargeV3Turbo, BaseEn, TinyEn",
-                getDefaultValue: () => "LargeV3");
+                description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
+                getDefaultValue: () => "LargeV3Turbo");
 
             var languageOption = new Option<string>(
                 name: "--language",
