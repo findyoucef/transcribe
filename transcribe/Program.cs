@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 
 namespace Transcribe
 {
@@ -42,9 +43,11 @@ namespace Transcribe
                         return;
                     }
 
+                    var stopwatch = Stopwatch.StartNew();
+
                     IProgress<int> progress = new Progress<int>(p =>
                     {
-                        Console.Write($"\rProgress: {p}%");
+                        Console.Write($"\rTranscribing: {p}%");
                         if (p >= 100)
                         {
                             Console.WriteLine();
@@ -52,6 +55,9 @@ namespace Transcribe
                     });
 
                     await WhisperClient.TranscribeAudioAsync(wavPath, progress, model, language);
+
+                    stopwatch.Stop();
+                    Console.WriteLine($"Transcription completed in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
                 }
                 catch (Exception ex)
                 {
