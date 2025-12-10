@@ -1,5 +1,4 @@
 using Whisper.net;
-using Whisper.net.Ggml;
 using System.Collections.Concurrent;
 
 namespace Transcribe

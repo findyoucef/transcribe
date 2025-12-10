@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Whisper.net.Ggml;
-using Whisper.net.Logger;
+﻿using Whisper.net.Ggml;
 using Whisper.net;
-using System.IO;
 
 namespace Transcribe
 {
