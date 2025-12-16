@@ -162,6 +162,12 @@ namespace Transcribe
             return finalStream;
         }
 
+        public int GetBytesPerSecond()
+        {
+            if (captureFormat == null) return 0;
+            return captureFormat.AverageBytesPerSecond;
+        }
+
         public void Dispose()
         {
             if (loopbackCapture != null)

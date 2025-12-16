@@ -1,5 +1,6 @@
 using Whisper.net;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace Transcribe
 {
@@ -17,8 +18,13 @@ namespace Transcribe
         private int audioLevelLine;
         private readonly StreamWriter transcriptWriter;
         private readonly string transcriptFileName;
+        private readonly string? sourceLabel;
+        private readonly bool showLevels;
+        private TimeSpan cumulativeOffset = TimeSpan.Zero;
+        private Stopwatch? recordingClock;
+        private readonly TranscriptionMerger? merger;
 
-        public WhisperStreamProcessor(string modelPath, string language, IAudioRecorder recorder, int chunkSizeSeconds = 3)
+        public WhisperStreamProcessor(string modelPath, string language, IAudioRecorder recorder, int chunkSizeSeconds = 3, string? sourceLabel = null, bool showLevels = true, string? transcriptFilePath = null, TranscriptionMerger? merger = null)
         {
             this.recorder = recorder;
             whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -26,33 +32,52 @@ namespace Transcribe
                 .WithLanguage(language)
                 .Build();
             
+            this.sourceLabel = sourceLabel;
+            this.showLevels = showLevels;
+            this.merger = merger;
+            
             processingQueue = new BlockingCollection<byte[]>();
             cancellationTokenSource = new CancellationTokenSource();
             audioBuffer = new List<byte>();
             
-            // 16kHz, 16-bit, mono = 32000 bytes/second
-            chunkSizeBytes = chunkSizeSeconds * 32000;
+            // Compute chunk size in bytes based on recorder throughput
+            var bytesPerSecond = recorder.GetBytesPerSecond();
+            if (bytesPerSecond <= 0)
+            {
+                // Fallback to 16kHz mono 16-bit
+                bytesPerSecond = 32000;
+            }
+            chunkSizeBytes = chunkSizeSeconds * bytesPerSecond;
             
-            // Create transcript file with GUID name
-            transcriptFileName = $"{Guid.NewGuid():N}.txt";
-            transcriptWriter = new StreamWriter(transcriptFileName, append: true) 
-            { 
-                AutoFlush = true 
-            };
+            // Use provided transcript path or create a new GUID
+            transcriptFileName = string.IsNullOrWhiteSpace(transcriptFilePath) ? $"{Guid.NewGuid():N}.txt" : transcriptFilePath;
+            
+            // If merger is not provided, create a private writer
+            if (merger == null)
+            {
+                var fs = new FileStream(transcriptFileName, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
+                fs.Seek(0, SeekOrigin.End); // append
+                transcriptWriter = new StreamWriter(fs) { AutoFlush = true };
+            }
+            else
+            {
+                transcriptWriter = TextWriter.Null as StreamWriter ?? new StreamWriter(Stream.Null);
+            }
         }
 
         public void StartProcessing()
         {
-            Console.WriteLine($"Saving transcript to: {transcriptFileName}");
+            Console.WriteLine($"Saving transcript to: {transcriptFileName}" + (sourceLabel != null ? $" [{sourceLabel}]" : string.Empty));
             Console.WriteLine();
             
-            // Capture the current line as the audio level line AFTER printing other messages
-            audioLevelLine = Console.CursorTop;
-            Console.WriteLine("Audio level: [                                                  ]");
-            Console.WriteLine();
+            // Start wall-clock timing
+            recordingClock = Stopwatch.StartNew();
             
             processingTask = Task.Run(() => ProcessAudioLoop());
-            visualizationTask = Task.Run(() => AudioVisualizationLoop());
+            if (showLevels)
+            {
+                visualizationTask = Task.Run(() => AudioVisualizationLoop());
+            }
         }
 
         private async Task AudioVisualizationLoop()
@@ -65,21 +90,20 @@ namespace Transcribe
                     var barLength = Math.Min((int)(level * 50), 50);
                     var bar = new string('=', barLength).PadRight(50);
                     
-                    var savedPos = Console.GetCursorPosition();
-                    Console.SetCursorPosition(0, audioLevelLine);
-                    Console.Write($"Audio level: [{bar}]");
-                    
-                    // Only restore position if we're not on the audio level line
-                    if (savedPos.Top != audioLevelLine)
+                    if (sourceLabel != null)
                     {
-                        Console.SetCursorPosition(savedPos.Left, savedPos.Top);
+                        Console.WriteLine($"[{sourceLabel}] Audio level: [{bar}]");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Audio level: [{bar}]");
                     }
                     
-                    await Task.Delay(50);
+                    await Task.Delay(500);
                 }
                 catch
                 {
-                    // Ignore cursor positioning errors
+                    // Ignore visualization errors
                 }
             }
         }
@@ -95,20 +119,35 @@ namespace Transcribe
 
                     audioBuffer.AddRange(chunk);
 
-                    // Process when we have enough data
-                    if (audioBuffer.Count >= chunkSizeBytes)
+                    int threshold = chunkSizeBytes;
+                    int earlyThreshold = chunkSizeBytes; // default: no early processing
+
+                    // Allow earlier processing only for microphone to reduce latency
+                    if (recorder is MicrophoneRecorder)
+                    {
+                        earlyThreshold = Math.Max(1, chunkSizeBytes / 3);
+                    }
+
+                    if (audioBuffer.Count >= threshold)
                     {
                         var audioToProcess = audioBuffer.ToArray();
                         audioBuffer.Clear();
-
-                        await ProcessAudioChunk(audioToProcess);
+                        var baseOffset = recordingClock?.Elapsed ?? TimeSpan.Zero;
+                        await ProcessAudioChunk(audioToProcess, baseOffset);
+                    }
+                    else if (recorder is MicrophoneRecorder && audioBuffer.Count >= earlyThreshold)
+                    {
+                        var audioToProcess = audioBuffer.ToArray();
+                        audioBuffer.Clear();
+                        var baseOffset = recordingClock?.Elapsed ?? TimeSpan.Zero;
+                        await ProcessAudioChunk(audioToProcess, baseOffset);
                     }
                 }
 
-                // Process any remaining audio
                 if (audioBuffer.Count > 0)
                 {
-                    await ProcessAudioChunk(audioBuffer.ToArray());
+                    var baseOffset = recordingClock?.Elapsed ?? TimeSpan.Zero;
+                    await ProcessAudioChunk(audioBuffer.ToArray(), baseOffset);
                     audioBuffer.Clear();
                 }
             }
@@ -119,7 +158,7 @@ namespace Transcribe
             }
         }
 
-        private async Task ProcessAudioChunk(byte[] audioData)
+        private async Task ProcessAudioChunk(byte[] audioData, TimeSpan chunkBaseOffset)
         {
             try
             {
@@ -127,29 +166,41 @@ namespace Transcribe
                 
                 var transcriptionLines = new List<string>();
                 var consoleText = new List<string>();
+                var items = new List<TranscriptionItem>();
                 
                 await foreach (var result in processor.ProcessAsync(wavStream))
                 {
                     if (!string.IsNullOrWhiteSpace(result.Text))
                     {
-                        // For file: include timestamp
-                        transcriptionLines.Add($"{result.Start}->{result.End}: {result.Text.Trim()}");
-                        
-                        // For console: just the text
+                        var adjStart = chunkBaseOffset + result.Start;
+                        var adjEnd = chunkBaseOffset + result.End;
+                        transcriptionLines.Add($"{adjStart}->{adjEnd}: {result.Text.Trim()}");
                         consoleText.Add(result.Text.Trim());
+                        items.Add(new TranscriptionItem(adjStart, adjEnd, result.Text.Trim(), sourceLabel ?? ""));
                     }
                 }
                 
                 if (consoleText.Count > 0)
                 {
-                    // Write to console (without timestamps)
                     var consoleOutput = string.Join(" ", consoleText);
-                    Console.WriteLine(consoleOutput);
-                    
-                    // Write to file (with timestamps)
-                    foreach (var line in transcriptionLines)
+                    if (sourceLabel != null)
+                        Console.WriteLine($"[{sourceLabel}] {consoleOutput}");
+                    else
+                        Console.WriteLine(consoleOutput);
+                }
+                
+                if (items.Count > 0)
+                {
+                    if (merger != null)
                     {
-                        transcriptWriter.WriteLine(line);
+                        merger.Submit(items);
+                    }
+                    else
+                    {
+                        foreach (var line in transcriptionLines)
+                        {
+                            transcriptWriter.WriteLine(line);
+                        }
                     }
                 }
             }

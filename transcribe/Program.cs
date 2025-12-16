@@ -201,28 +201,54 @@ namespace Transcribe
                 description: "Speaker/output device number to use (use 'list-speakers' to see available devices). Default: 0",
                 getDefaultValue: () => 0);
 
-            var speakerCommand = new Command("speaker", "Transcribe speaker/output audio in real-time")
+            var micDeviceOption = new Option<int>(
+                name: "--mic-device",
+                description: "Microphone device number to capture your voice (use 'list-devices' to see available devices). Default: 0",
+                getDefaultValue: () => 0);
+
+            var speakerCommand = new Command("speaker", "Transcribe speaker/output audio and microphone in real-time")
             {
                 modelOption,
                 languageOption,
                 chunkSizeOption,
-                deviceOption
+                deviceOption,
+                micDeviceOption
             };
 
-            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device) =>
+            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device, int micDevice) =>
             {
                 try
                 {
                     var modelPath = await WhisperClient.EnsureModelDownloaded(model);
                     
-                    Console.WriteLine($"Starting speaker transcription using device {device}. Press Ctrl+C to stop...");
+                    Console.WriteLine($"Starting conversation transcription:");
+                    Console.WriteLine($"  Speaker device: {device}");
+                    Console.WriteLine($"  Microphone device: {micDevice}");
+                    Console.WriteLine($"  Model: {model}");
+                    Console.WriteLine($"  Language: {language}");
+                    Console.WriteLine($"  Chunk size: {chunkSize} sec");
+                    Console.WriteLine();
+                    Console.WriteLine("Each source will be processed separately to minimize latency.");
+                    Console.WriteLine("Press Ctrl+C to stop...");
                     Console.WriteLine();
 
-                    using var recorder = new SpeakerRecorder(deviceNumber: device);
-                    using var processor = new WhisperStreamProcessor(modelPath, language, recorder, chunkSize);
+                    using var speakerRecorder = new SpeakerRecorder(deviceNumber: device);
+                    using var micRecorder = new MicrophoneRecorder(deviceNumber: micDevice, bufferMilliseconds: 50, useWasapiExclusive: false);
 
-                    recorder.StartRecording();
-                    processor.StartProcessing();
+                    // Create shared transcript file path (GUID-based to match existing convention)
+                    var sharedTranscript = $"{Guid.NewGuid():N}.txt";
+                    using var merger = new TranscriptionMerger(sharedTranscript, TimeSpan.FromSeconds(3));
+
+                    // Create two processors with labels, sharing the same transcript file via merger
+                    using var speakerProcessor = new WhisperStreamProcessor(modelPath, language, speakerRecorder, chunkSize, sourceLabel: "SPK", showLevels: false, transcriptFilePath: sharedTranscript, merger: merger);
+                    using var micProcessor = new WhisperStreamProcessor(modelPath, language, micRecorder, chunkSize, sourceLabel: "MIC", showLevels: false, transcriptFilePath: sharedTranscript, merger: merger);
+
+                    // Start both
+                    speakerRecorder.StartRecording();
+                    micRecorder.StartRecording();
+
+                    speakerProcessor.StartProcessing();
+                    micProcessor.StartProcessing();
 
                     // Wait for Ctrl+C
                     var tcs = new TaskCompletionSource<bool>();
@@ -237,16 +263,20 @@ namespace Transcribe
                     Console.WriteLine();
                     Console.WriteLine("Stopping transcription...");
                     
-                    recorder.StopRecording();
-                    await processor.StopProcessing();
+                    speakerRecorder.StopRecording();
+                    micRecorder.StopRecording();
+
+                    await speakerProcessor.StopProcessing();
+                    await micProcessor.StopProcessing();
 
                     Console.WriteLine("Transcription stopped.");
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"Error: {ex.Message}");
+                    Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
-            }, modelOption, languageOption, chunkSizeOption, deviceOption);
+            }, modelOption, languageOption, chunkSizeOption, deviceOption, micDeviceOption);
 
             return speakerCommand;
         }

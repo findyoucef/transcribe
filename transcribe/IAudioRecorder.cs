@@ -7,5 +7,6 @@ namespace Transcribe
         float GetCurrentAudioLevel();
         IEnumerable<byte[]> GetAudioChunks();
         MemoryStream CreateWavStream(byte[] audioData);
+        int GetBytesPerSecond();
     }
 }
