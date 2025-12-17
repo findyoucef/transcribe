@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading;
 
 namespace Transcribe
 {
@@ -13,6 +15,7 @@ namespace Transcribe
         private readonly TimeSpan flushWindow;
         private readonly CancellationTokenSource cts = new();
         private Task? worker;
+        private int disposedFlag = 0;
 
         public TranscriptionMerger(string transcriptFilePath, TimeSpan? flushWindow = null)
         {
@@ -81,14 +84,23 @@ namespace Transcribe
 
         public void Dispose()
         {
-            cts.Cancel();
-            worker?.Wait();
-            lock (writeLock)
+            if (Interlocked.Exchange(ref disposedFlag, 1) == 1)
             {
-                writer.Dispose();
+                return; // already disposed
             }
-            queue.Dispose();
-            cts.Dispose();
+
+            try { cts.Cancel(); } catch (ObjectDisposedException) { }
+            try { worker?.Wait(); } catch { }
+            try
+            {
+                lock (writeLock)
+                {
+                    writer.Dispose();
+                }
+            }
+            catch { }
+            try { queue.Dispose(); } catch { }
+            try { cts.Dispose(); } catch { }
         }
     }
 }
