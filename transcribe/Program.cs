@@ -46,7 +46,7 @@ namespace Transcribe
             var modelOption = new Option<string>(
                 name: "--model",
                 description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "LargeV3Turbo");
+                getDefaultValue: () => "TinyEn");
 
             var languageOption = new Option<string>(
                 name: "--language",
@@ -100,7 +100,7 @@ namespace Transcribe
             var modelOption = new Option<string>(
                 name: "--model",
                 description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "LargeV3Turbo");
+                getDefaultValue: () => "TinyEn");
 
             var languageOption = new Option<string>(
                 name: "--language",
@@ -117,15 +117,21 @@ namespace Transcribe
                 description: "Microphone device number to use (use 'list-devices' to see available devices). Default: 0",
                 getDefaultValue: () => 0);
 
+            var summarizeOption = new Option<bool>(
+                name: "--summarize",
+                description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
+                getDefaultValue: () => false);
+
             var micCommand = new Command("mic", "Transcribe microphone input in real-time")
             {
                 modelOption,
                 languageOption,
                 chunkSizeOption,
-                deviceOption
+                deviceOption,
+                summarizeOption
             };
 
-            micCommand.SetHandler(async (string model, string language, int chunkSize, int device) =>
+            micCommand.SetHandler(async (string model, string language, int chunkSize, int device, bool summarize) =>
             {
                 try
                 {
@@ -134,27 +140,45 @@ namespace Transcribe
                     Console.WriteLine($"Starting microphone transcription using device {device}. Press Ctrl+C to stop...");
                     Console.WriteLine();
 
-                    using var recorder = new MicrophoneRecorder(deviceNumber: device);
-                    using var processor = new WhisperStreamProcessor(modelPath, language, recorder, chunkSize);
-
-                    recorder.StartRecording();
-                    processor.StartProcessing();
-
-                    // Wait for Ctrl+C
-                    var tcs = new TaskCompletionSource<bool>();
-                    Console.CancelKeyPress += (s, e) =>
+                    var micTranscript = $"{Guid.NewGuid():N}.txt";
                     {
-                        e.Cancel = true;
-                        tcs.TrySetResult(true);
-                    };
+                        using var recorder = new MicrophoneRecorder(deviceNumber: device);
+                        using var processor = new WhisperStreamProcessor(modelPath, language, recorder, chunkSize, transcriptFilePath: micTranscript);
 
-                    await tcs.Task;
+                        recorder.StartRecording();
+                        processor.StartProcessing();
 
-                    Console.WriteLine();
-                    Console.WriteLine("Stopping transcription...");
-                    
-                    recorder.StopRecording();
-                    await processor.StopProcessing();
+                        // Wait for Ctrl+C
+                        var tcs = new TaskCompletionSource<bool>();
+                        Console.CancelKeyPress += (s, e) =>
+                        {
+                            e.Cancel = true;
+                            tcs.TrySetResult(true);
+                        };
+
+                        await tcs.Task;
+
+                        Console.WriteLine();
+                        Console.WriteLine("Stopping transcription...");
+                        
+                        recorder.StopRecording();
+                        await processor.StopProcessing();
+                    }
+
+                    // Summarize after resources are disposed
+                    if (summarize)
+                    {
+                        try
+                        {
+                            var transcriptText = await File.ReadAllTextAsync(micTranscript);
+                            var ollama = new transcribe.OllamaClient("http://localhost:11434/", "tx-agent:latest");
+                            await ollama.SummarizeTranscript(transcriptText);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"Summarization error: {ex.Message}");
+                        }
+                    }
 
                     Console.WriteLine("Transcription stopped.");
                 }
@@ -162,7 +186,7 @@ namespace Transcribe
                 {
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
-            }, modelOption, languageOption, chunkSizeOption, deviceOption);
+            }, modelOption, languageOption, chunkSizeOption, deviceOption, summarizeOption);
 
             return micCommand;
         }
@@ -184,7 +208,7 @@ namespace Transcribe
             var modelOption = new Option<string>(
                 name: "--model",
                 description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "LargeV3Turbo");
+                getDefaultValue: () => "TinyEn");
 
             var languageOption = new Option<string>(
                 name: "--language",
@@ -203,8 +227,13 @@ namespace Transcribe
 
             var micDeviceOption = new Option<int>(
                 name: "--mic-device",
-                description: "Microphone device number to capture your voice (use 'list-devices' to see available devices). Default: 0",
-                getDefaultValue: () => 0);
+                description: "Microphone device number to capture your voice (use 'list-devices' to see available devices). Set to -1 to disable mic (default).",
+                getDefaultValue: () => -1);
+
+            var summarizeOption = new Option<bool>(
+                name: "--summarize",
+                description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
+                getDefaultValue: () => false);
 
             var speakerCommand = new Command("speaker", "Transcribe speaker/output audio and microphone in real-time")
             {
@@ -212,10 +241,11 @@ namespace Transcribe
                 languageOption,
                 chunkSizeOption,
                 deviceOption,
-                micDeviceOption
+                micDeviceOption,
+                summarizeOption
             };
 
-            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device, int micDevice) =>
+            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device, int micDevice, bool summarize) =>
             {
                 try
                 {
@@ -223,7 +253,9 @@ namespace Transcribe
                     
                     Console.WriteLine($"Starting conversation transcription:");
                     Console.WriteLine($"  Speaker device: {device}");
-                    Console.WriteLine($"  Microphone device: {micDevice}");
+                    Console.WriteLine(micDevice >= 0
+                        ? $"  Microphone device: {micDevice}"
+                        : "  Microphone device: disabled");
                     Console.WriteLine($"  Model: {model}");
                     Console.WriteLine($"  Language: {language}");
                     Console.WriteLine($"  Chunk size: {chunkSize} sec");
@@ -233,22 +265,32 @@ namespace Transcribe
                     Console.WriteLine();
 
                     using var speakerRecorder = new SpeakerRecorder(deviceNumber: device);
-                    using var micRecorder = new MicrophoneRecorder(deviceNumber: micDevice, bufferMilliseconds: 50, useWasapiExclusive: false);
 
                     // Create shared transcript file path (GUID-based to match existing convention)
                     var sharedTranscript = $"{Guid.NewGuid():N}.txt";
                     using var merger = new TranscriptionMerger(sharedTranscript, TimeSpan.FromSeconds(3));
 
-                    // Create two processors with labels, sharing the same transcript file via merger
+                    // Speaker processor
                     using var speakerProcessor = new WhisperStreamProcessor(modelPath, language, speakerRecorder, chunkSize, sourceLabel: "SPK", showLevels: false, transcriptFilePath: sharedTranscript, merger: merger);
-                    using var micProcessor = new WhisperStreamProcessor(modelPath, language, micRecorder, chunkSize, sourceLabel: "MIC", showLevels: false, transcriptFilePath: sharedTranscript, merger: merger);
 
-                    // Start both
+                    // Optional mic
+                    MicrophoneRecorder? micRecorder = null;
+                    WhisperStreamProcessor? micProcessor = null;
+                    if (micDevice >= 0)
+                    {
+                        micRecorder = new MicrophoneRecorder(deviceNumber: micDevice, bufferMilliseconds: 50, useWasapiExclusive: false);
+                        micProcessor = new WhisperStreamProcessor(modelPath, language, micRecorder, chunkSize, sourceLabel: "MIC", showLevels: false, transcriptFilePath: sharedTranscript, merger: merger);
+                    }
+
+                    // Start speaker
                     speakerRecorder.StartRecording();
-                    micRecorder.StartRecording();
-
                     speakerProcessor.StartProcessing();
-                    micProcessor.StartProcessing();
+                    // Start mic if enabled
+                    if (micRecorder != null && micProcessor != null)
+                    {
+                        micRecorder.StartRecording();
+                        micProcessor.StartProcessing();
+                    }
 
                     // Wait for Ctrl+C
                     var tcs = new TaskCompletionSource<bool>();
@@ -264,10 +306,28 @@ namespace Transcribe
                     Console.WriteLine("Stopping transcription...");
                     
                     speakerRecorder.StopRecording();
-                    micRecorder.StopRecording();
-
                     await speakerProcessor.StopProcessing();
-                    await micProcessor.StopProcessing();
+                    if (micRecorder != null && micProcessor != null)
+                    {
+                        micRecorder.StopRecording();
+                        await micProcessor.StopProcessing();
+                    }
+                    // Ensure merger closes its writer before reading the transcript
+                    merger.Dispose();
+
+                    if (summarize)
+                    {
+                        try
+                        {
+                            var transcriptText = await File.ReadAllTextAsync(sharedTranscript);
+                            var ollama = new transcribe.OllamaClient("http://localhost:11434/", "tx-agent:latest");
+                            await ollama.SummarizeTranscript(transcriptText);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"Summarization error: {ex.Message}");
+                        }
+                    }
 
                     Console.WriteLine("Transcription stopped.");
                 }
@@ -276,7 +336,7 @@ namespace Transcribe
                     Console.Error.WriteLine($"Error: {ex.Message}");
                     Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
-            }, modelOption, languageOption, chunkSizeOption, deviceOption, micDeviceOption);
+            }, modelOption, languageOption, chunkSizeOption, deviceOption, micDeviceOption, summarizeOption);
 
             return speakerCommand;
         }
