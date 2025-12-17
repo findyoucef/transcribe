@@ -1,10 +1,11 @@
 # Transcribe
 
-Command-line transcription using Whisper. Supports batch WAV transcription and real-time capture from microphones or speakers, with live audio-level visualization and timestamped outputs.
+Command-line transcription using Whisper. Supports batch WAV transcription, real-time mic capture, speaker/output capture, optional dual-source (speaker + mic) transcription, and post-run summarization via Ollama. Live modes show audio levels and write timestamped text.
 
 ## Requirements
 - .NET 10 SDK
 - Windows audio stack (NAudio WASAPI) for live mic/speaker capture
+- Optional: running Ollama server at `http://localhost:11434/` with model `tx-agent:latest` for summaries
 
 ## Build
 ```bash
@@ -13,7 +14,14 @@ dotnet build
 ```
 
 ## Usage
-Build (or publish) the app, then run the binary (`./transcribe` on Linux/macOS, `transcribe.exe` on Windows). Binaries live under `transcribe/bin/<Config>/net10.0/`.
+Build (or publish) the app, then run the binary (`./transcribe` on Linux/macOS, `transcribe.exe` on Windows). Binaries live under `transcribe/bin/<Config>/net10.0/`. Models are downloaded on first use and cached next to the binary.
+
+### Commands
+- `file`: transcribe a WAV file.
+- `mic`: real-time microphone transcription.
+- `speaker`: real-time system-output transcription, with optional mic capture for conversations.
+- `list-devices`: list microphones.
+- `list-speakers`: list output devices.
 
 ### Transcribe a WAV file
 ```bash
@@ -24,35 +32,40 @@ Build (or publish) the app, then run the binary (`./transcribe` on Linux/macOS, 
 - Examples:
   - `./transcribe file sample.wav`
   - `./transcribe file sample.wav --model LargeV3 --language fr`
+  - `./transcribe file sample.wav --model TinyEn`
 
 ### Live microphone transcription
 ```bash
-./transcribe mic [--device <number>] [--chunk-size <seconds>] [--model <name>] [--language <code>]
+./transcribe mic [--device <number>] [--chunk-size <seconds>] [--model <name>] [--language <code>] [--summarize]
 ```
 - Shows a live audio-level bar; press `Ctrl+C` to stop.
 - Saves a timestamped transcript to a new GUID-named `.txt` file in the working directory.
 - Defaults: device `0`, chunk size `3s`.
+- Add `--summarize` to stream a summary via Ollama after transcription finishes.
 - List devices first with `./transcribe list-devices`.
 
 ### Live speaker/output transcription
 ```bash
-./transcribe speaker [--device <number>] [--chunk-size <seconds>] [--model <name>] [--language <code>]
+./transcribe speaker [--device <number>] [--chunk-size <seconds>] [--model <name>] [--language <code>] [--mic-device <number>] [--summarize]
 ```
 - Captures system output via WASAPI loopback.
-- Same defaults and output behavior as microphone mode.
+- Optionally capture your mic simultaneously (`--mic-device <n>`, default `-1` disables). Speaker and mic audio are processed separately and merged chronologically into one transcript.
+- Same defaults and output behavior as microphone mode (chunk `3s`, device `0`, summary disabled by default).
+- Add `--summarize` to stream a summary via Ollama after transcription finishes.
 - List speakers first with `./transcribe list-speakers`.
 
 ### Models
 Supported values (downloaded on first use into the app’s binary directory):
-- `LargeV3Turbo` (default)
+- `LargeV3Turbo`
 - `LargeV3`
 - `BaseEn`
-- `TinyEn`
+- `TinyEn` (CLI default)
 
 ### Languages
 - Default is `en`. Pass ISO codes (e.g., `en`, `fr`, `es`) to `--language`.
 
 ## Notes
-- Network is required only for the initial model download.
+- Network is required only for the initial model download (and Ollama summaries if enabled).
 - Standard PCM WAV input works best; malformed headers will skip progress reporting.
-- Keep the working directory writable so transcript files can be created.
+- Live modes write transcript files in the working directory using GUID names; make sure it is writable.
+- Audio processing uses NAudio WASAPI. If a device index is invalid, the app will list the range to help pick a valid one.
