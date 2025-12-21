@@ -30,26 +30,54 @@ namespace Transcribe
 
         public static void ListMicrophones()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.WriteLine("Microphone device listing is only supported on Windows.");
+                return;
+            }
+
             Console.WriteLine("Available microphone devices:");
             Console.WriteLine();
-            for (int i = 0; i < WaveInEvent.DeviceCount; i++)
+            var devices = GetMicrophones();
+            foreach (var device in devices)
             {
-                var capabilities = WaveInEvent.GetCapabilities(i);
-                Console.WriteLine($"  [{i}] {capabilities.ProductName}");
-                Console.WriteLine($"      Channels: {capabilities.Channels}");
+                Console.WriteLine($"  [{device.Index}] {device.Name}");
+                Console.WriteLine($"      Channels: {device.Channels}");
                 Console.WriteLine();
             }
 
-            if (WaveInEvent.DeviceCount == 0)
+            if (devices.Count == 0)
             {
                 Console.WriteLine("  No microphone devices found!");
             }
+        }
+
+        public static IReadOnlyList<AudioDeviceInfo> GetMicrophones()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return Array.Empty<AudioDeviceInfo>();
+            }
+
+            var devices = new List<AudioDeviceInfo>();
+            for (int i = 0; i < WaveInEvent.DeviceCount; i++)
+            {
+                var capabilities = WaveInEvent.GetCapabilities(i);
+                devices.Add(new AudioDeviceInfo(i, capabilities.ProductName, capabilities.Channels));
+            }
+
+            return devices;
         }
 
         public void StartRecording()
         {
             if (isRecording)
                 return;
+
+            if (!OperatingSystem.IsWindows())
+            {
+                throw new PlatformNotSupportedException("Live microphone capture is only supported on Windows.");
+            }
 
             if (useWasapiExclusive)
             {

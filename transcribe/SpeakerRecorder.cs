@@ -21,6 +21,12 @@ namespace Transcribe
 
         public static void ListSpeakers()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.WriteLine("Speaker/output device listing is only supported on Windows.");
+                return;
+            }
+
             Console.WriteLine("Available speaker/output devices:");
             Console.WriteLine();
             
@@ -41,10 +47,34 @@ namespace Transcribe
             }
         }
 
+        public static IReadOnlyList<AudioDeviceInfo> GetSpeakers()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return Array.Empty<AudioDeviceInfo>();
+            }
+
+            var enumerator = new MMDeviceEnumerator();
+            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+            var result = new List<AudioDeviceInfo>(devices.Count);
+            for (int i = 0; i < devices.Count; i++)
+            {
+                var device = devices[i];
+                result.Add(new AudioDeviceInfo(i, device.FriendlyName, device.AudioClient.MixFormat.Channels));
+            }
+
+            return result;
+        }
+
         public void StartRecording()
         {
             if (isRecording)
                 return;
+
+            if (!OperatingSystem.IsWindows())
+            {
+                throw new PlatformNotSupportedException("Live speaker/output capture is only supported on Windows.");
+            }
 
             var enumerator = new MMDeviceEnumerator();
             var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);

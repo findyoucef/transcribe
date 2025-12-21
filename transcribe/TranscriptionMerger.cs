@@ -41,8 +41,7 @@ namespace Transcribe
             {
                 while (!cts.Token.IsCancellationRequested)
                 {
-                    TranscriptionItem item;
-                    if (queue.TryTake(out item, 100))
+                    if (queue.TryTake(out var item, 100))
                     {
                         buffer.Add(item);
                     }

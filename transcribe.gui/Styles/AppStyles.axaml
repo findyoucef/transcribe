@@ -1,0 +1,136 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Styles.Resources>
+    <!-- Spacing tokens -->
+    <x:Double x:Key="SpaceS">8</x:Double>
+    <x:Double x:Key="SpaceM">16</x:Double>
+    <x:Double x:Key="SpaceL">24</x:Double>
+    <x:Double x:Key="RowGap">12</x:Double>
+    <x:Double x:Key="LabelWidth">120</x:Double>
+    <x:Double x:Key="ControlHeight">34</x:Double>
+
+    <!-- Thickness tokens -->
+    <Thickness x:Key="PadS">8</Thickness>
+    <Thickness x:Key="PadM">16</Thickness>
+    <Thickness x:Key="PadL">24</Thickness>
+  </Styles.Resources>
+
+  <!-- Card container -->
+  <Style Selector="Border.card">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="#252525" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="#33FFFFFF" />
+    <Setter Property="Padding" Value="{DynamicResource PadM}" />
+    <Setter Property="Margin" Value="0,0,0,16" />
+  </Style>
+
+  <!-- Headers -->
+  <Style Selector="TextBlock.sectionHeader">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource SystemAccentColorLight2}" />
+    <Setter Property="Margin" Value="0,0,0,16" />
+  </Style>
+
+  <Style Selector="TextBlock.formLabel">
+    <Setter Property="Foreground" Value="#D0D0D0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Width" Value="{DynamicResource LabelWidth}" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="TextAlignment" Value="Left" />
+  </Style>
+
+  <!-- Controls -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Height" Value="{DynamicResource ControlHeight}" />
+  </Style>
+
+  <Style Selector="TextBox.viewer">
+    <Setter Property="FontFamily" Value="Consolas, monospace" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Background" Value="#151515" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Height" Value="NaN" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Height" Value="{DynamicResource ControlHeight}" />
+  </Style>
+
+  <Style Selector="NumericUpDown">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Height" Value="{DynamicResource ControlHeight}" />
+  </Style>
+
+  <!-- Buttons -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Height" Value="{DynamicResource ControlHeight}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SystemAccentColorLight1}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="Button.destructive">
+    <Setter Property="Background" Value="#D32F2F" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.destructive:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="#E57373" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="#80FFFFFF" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="TextBlock.warning">
+    <Setter Property="Foreground" Value="#FFA726" />
+  </Style>
+  
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="#EF5350" />
+  </Style>
+
+  <!-- Sidebar Tabs Style -->
+  <Style Selector="TabControl.sidebar">
+    <Setter Property="TabStripPlacement" Value="Left" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="TabControl.sidebar > TabItem">
+    <Setter Property="Padding" Value="20,12" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="#A0A0A0" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  
+  <Style Selector="TabControl.sidebar > TabItem:selected">
+    <Setter Property="Background" Value="#303030" />
+    <Setter Property="Foreground" Value="{DynamicResource SystemAccentColorLight2}" />
+  </Style>
+  
+  <Style Selector="TabControl.sidebar > TabItem:pointerover">
+    <Setter Property="Background" Value="#252525" />
+  </Style>
+
+</Styles>

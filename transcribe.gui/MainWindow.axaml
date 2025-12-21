@@ -1,0 +1,365 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:Transcribe.Gui.Converters"
+        mc:Ignorable="d"
+        x:Class="Transcribe.Gui.MainWindow"
+        Width="1100" Height="1200"
+        MinWidth="950" MinHeight="700"
+        Title="Transcribe AI"
+        Background="#1A1A1A">
+
+  <Window.Resources>
+    <conv:BooleanNotConverter x:Key="Not" />
+  </Window.Resources>
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveOutputCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="640, *" Margin="{DynamicResource PadL}">
+    
+    <!-- Top Area: Mode Selection & Configuration -->
+    <TabControl Grid.Row="0" Classes="sidebar" SelectedIndex="{Binding SelectedModeIndex}">
+      
+      <!-- MODE: FILE -->
+      <TabItem Header="File">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
+            
+            <TextBlock Classes="sectionHeader" Text="File Transcription" />
+
+            <!-- Input Source -->
+            <Border Classes="card">
+              <StackPanel Spacing="{DynamicResource RowGap}">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Input File" />
+                  <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding WavFilePath}" Watermark="Select a .wav file" />
+                  <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource SpaceS}">
+                    <Button Content="Browse…" Command="{Binding BrowseWavFileCommand}" />
+                    <TextBlock Text="!" Classes="warning" IsVisible="{Binding IsWavFileValid, Converter={StaticResource Not}}" ToolTip.Tip="{Binding WavFileValidationMessage}" VerticalAlignment="Center" />
+                  </StackPanel>
+
+                  <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Output Folder" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputFolder}" Watermark="Same as input" />
+                  <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="{DynamicResource SpaceS}">
+                    <Button Content="Browse…" Command="{Binding BrowseOutputFolderCommand}" />
+                    <TextBlock Text="!" Classes="warning" IsVisible="{Binding IsOutputFolderValid, Converter={StaticResource Not}}" ToolTip.Tip="{Binding OutputFolderValidationMessage}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- Settings -->
+            <Border Classes="card">
+              <StackPanel Spacing="{DynamicResource RowGap}">
+                <TextBlock Text="Processing Settings" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Language" />
+                  <AutoCompleteBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Languages}" Text="{Binding SelectedLanguage}" />
+                  
+                  <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Whisper Model" />
+                  <ComboBox Grid.Row="0" Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" />
+                </Grid>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+
+                <!-- Ollama Section -->
+                <DockPanel LastChildFill="True">
+                  <ToggleSwitch DockPanel.Dock="Left" Content="Summarize with Ollama" IsChecked="{Binding SummarizeWithOllama}" />
+                </DockPanel>
+
+                <StackPanel IsVisible="{Binding ShowOllamaSettings}" Margin="0,8,0,0" Spacing="{DynamicResource RowGap}">
+                   <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Ollama URL" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OllamaUrl}" Watermark="http://localhost:11434/" />
+                      <Button Grid.Row="0" Grid.Column="2" Content="Test" Command="{Binding TestOllamaConnectionCommand}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="LLM Model" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OllamaModel}" Watermark="tx-agent:latest" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Status" />
+                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" Classes.muted="{Binding !IsOllamaConnected}" />
+                   </Grid>
+                   <TextBlock IsVisible="{Binding IsOllamaUrlValid, Converter={StaticResource Not}}" Classes="error" Text="{Binding OllamaUrlValidationMessage}" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                <Button Classes="secondary" Content="Reset Settings" Command="{Binding ResetDefaultsCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+
+            <!-- Action Area -->
+            <Border Classes="card" Background="#2A2A2A" BorderBrush="{DynamicResource SystemAccentColor}">
+               <DockPanel LastChildFill="True">
+                 <Button DockPanel.Dock="Right" Classes="primary" Content="Start Transcription" Command="{Binding StartCommand}" ToolTip.Tip="{Binding CannotStartReason}" Width="180" FontWeight="Bold" />
+                 <StackPanel VerticalAlignment="Center">
+                   <TextBlock Text="{Binding RunStatusLine}" FontWeight="Medium" />
+                   <TextBlock Classes="muted" Text="{Binding CannotStartReason}" IsVisible="{Binding ShowCannotStartReason}" FontSize="12" Margin="0,4,0,0" />
+                 </StackPanel>
+               </DockPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- MODE: MICROPHONE -->
+      <TabItem Header="Microphone">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
+            <TextBlock Classes="sectionHeader" Text="Live Microphone" />
+            
+            <TextBlock IsVisible="{Binding IsWindows, Converter={StaticResource Not}}" Classes="warning" Text="Live microphone capture is only supported on Windows." Margin="0,0,0,10" />
+
+            <Border Classes="card">
+               <StackPanel Spacing="{DynamicResource RowGap}">
+                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Microphone" />
+                    <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding MicDevices}" SelectedItem="{Binding SelectedMicDevice}" />
+                    <Button Grid.Row="0" Grid.Column="2" Content="↻" Command="{Binding RefreshDevicesCommand}" ToolTip.Tip="Refresh Devices" Padding="10,0" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Save to" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OutputFolder}" Watermark="Select folder (Optional)" />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Browse…" Command="{Binding BrowseOutputFolderCommand}" />
+                 </Grid>
+               </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="{DynamicResource RowGap}">
+                <TextBlock Text="Processing Settings" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Language" />
+                  <AutoCompleteBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Languages}" Text="{Binding SelectedLanguage}" />
+                  
+                  <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Whisper Model" />
+                  <ComboBox Grid.Row="0" Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" />
+                  
+                  <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Chunk Size" />
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                     <NumericUpDown Minimum="1" Maximum="60" Increment="1" Width="120" Value="{Binding ChunkSizeSeconds}" />
+                     <TextBlock Text="seconds" VerticalAlignment="Center" Classes="muted" />
+                  </StackPanel>
+                </Grid>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+
+                 <!-- Ollama Section (Reused) -->
+                <DockPanel LastChildFill="True">
+                  <ToggleSwitch DockPanel.Dock="Left" Content="Summarize with Ollama" IsChecked="{Binding SummarizeWithOllama}" />
+                </DockPanel>
+
+                <StackPanel IsVisible="{Binding ShowOllamaSettings}" Margin="0,8,0,0" Spacing="{DynamicResource RowGap}">
+                   <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Ollama URL" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OllamaUrl}" />
+                      <Button Grid.Row="0" Grid.Column="2" Content="Test" Command="{Binding TestOllamaConnectionCommand}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="LLM Model" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OllamaModel}" />
+                      
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Status" />
+                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
+                   </Grid>
+                </StackPanel>
+                
+                <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                <Button Classes="secondary" Content="Reset Settings" Command="{Binding ResetDefaultsCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Background="#2A2A2A" BorderBrush="{DynamicResource SystemAccentColor}">
+               <DockPanel LastChildFill="True">
+                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10">
+                    <Button Classes="primary" Content="Start Recording" Command="{Binding StartCommand}" ToolTip.Tip="{Binding CannotStartReason}" Width="160" FontWeight="Bold" />
+                    <Button Classes="destructive" Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsRunning}" Width="100" />
+                 </StackPanel>
+                 <StackPanel VerticalAlignment="Center">
+                   <TextBlock Text="{Binding RunStatusLine}" FontWeight="Medium" />
+                   <TextBlock Classes="muted" Text="{Binding CannotStartReason}" IsVisible="{Binding ShowCannotStartReason}" FontSize="12" Margin="0,4,0,0" />
+                 </StackPanel>
+               </DockPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- MODE: SPEAKER -->
+      <TabItem Header="Speaker">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
+             <TextBlock Classes="sectionHeader" Text="System Audio Capture" />
+             <TextBlock IsVisible="{Binding IsWindows, Converter={StaticResource Not}}" Classes="warning" Text="Live speaker capture is only supported on Windows." Margin="0,0,0,10" />
+
+            <Border Classes="card">
+               <StackPanel Spacing="{DynamicResource RowGap}">
+                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Speaker" />
+                    <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding SpeakerDevices}" SelectedItem="{Binding SelectedSpeakerDevice}" />
+                    <Button Grid.Row="0" Grid.Column="2" Content="↻" Command="{Binding RefreshDevicesCommand}" Padding="10,0" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Mic (Optional)" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding MicDevices}" SelectedItem="{Binding SelectedMicDevice}" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="For Conversation" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Save to" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding OutputFolder}" Watermark="Select folder (Optional)" />
+                    <Button Grid.Row="2" Grid.Column="2" Content="Browse…" Command="{Binding BrowseOutputFolderCommand}" />
+                 </Grid>
+               </StackPanel>
+            </Border>
+
+            <!-- Reusing Processing Settings block structure -->
+            <Border Classes="card">
+              <StackPanel Spacing="{DynamicResource RowGap}">
+                <TextBlock Text="Processing Settings" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Language" />
+                  <AutoCompleteBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Languages}" Text="{Binding SelectedLanguage}" />
+                  
+                  <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Whisper Model" />
+                  <ComboBox Grid.Row="0" Grid.Column="3" HorizontalAlignment="Stretch" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" />
+                  
+                  <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Chunk Size" />
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                     <NumericUpDown Minimum="1" Maximum="60" Increment="1" Width="120" Value="{Binding ChunkSizeSeconds}" />
+                     <TextBlock Text="seconds" VerticalAlignment="Center" Classes="muted" />
+                  </StackPanel>
+                </Grid>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+                
+                <DockPanel LastChildFill="True">
+                  <ToggleSwitch DockPanel.Dock="Left" Content="Summarize with Ollama" IsChecked="{Binding SummarizeWithOllama}" />
+                </DockPanel>
+
+                <StackPanel IsVisible="{Binding ShowOllamaSettings}" Margin="0,8,0,0" Spacing="{DynamicResource RowGap}">
+                   <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Ollama URL" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OllamaUrl}" />
+                      <Button Grid.Row="0" Grid.Column="2" Content="Test" Command="{Binding TestOllamaConnectionCommand}" />
+                      
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="LLM Model" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding OllamaModel}" />
+                      
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Status" />
+                      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ConnectionStatusText}" VerticalAlignment="Center" />
+                   </Grid>
+                </StackPanel>
+                
+                <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                <Button Classes="secondary" Content="Reset Settings" Command="{Binding ResetDefaultsCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Background="#2A2A2A" BorderBrush="{DynamicResource SystemAccentColor}">
+               <DockPanel LastChildFill="True">
+                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10">
+                    <Button Classes="primary" Content="Start Capture" Command="{Binding StartCommand}" ToolTip.Tip="{Binding CannotStartReason}" Width="160" FontWeight="Bold" />
+                    <Button Classes="destructive" Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsRunning}" Width="100" />
+                 </StackPanel>
+                 <StackPanel VerticalAlignment="Center">
+                   <TextBlock Text="{Binding RunStatusLine}" FontWeight="Medium" />
+                   <TextBlock Classes="muted" Text="{Binding CannotStartReason}" IsVisible="{Binding ShowCannotStartReason}" FontSize="12" Margin="0,4,0,0" />
+                 </StackPanel>
+               </DockPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      
+      <!-- MODE: DEVICES -->
+      <TabItem Header="Devices">
+        <ScrollViewer>
+           <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
+             <TextBlock Classes="sectionHeader" Text="Detected Devices" />
+             <Border Classes="card">
+               <StackPanel Spacing="{DynamicResource SpaceM}">
+                  <TextBlock Text="Available Audio Hardware" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource SpaceL}">
+                     <StackPanel Grid.Column="0">
+                        <TextBlock Classes="muted" Text="Playback / Speakers" Margin="0,0,0,8" />
+                        <ListBox ItemsSource="{Binding SpeakerDevices}" Height="200" Background="#111" />
+                     </StackPanel>
+                     <StackPanel Grid.Column="1">
+                        <TextBlock Classes="muted" Text="Recording / Microphones" Margin="0,0,0,8" />
+                        <ListBox ItemsSource="{Binding MicDevices}" Height="200" Background="#111" />
+                     </StackPanel>
+                  </Grid>
+                  <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                  <Button Classes="secondary" Content="Refresh List" Command="{Binding RefreshDevicesCommand}" HorizontalAlignment="Left" />
+               </StackPanel>
+             </Border>
+           </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+
+    <!-- Bottom: Global Output Panel -->
+    <Border Grid.Row="1" Classes="card" Margin="0,8,0,0" Padding="0">
+      <Grid RowDefinitions="Auto, *, Auto">
+        <Border Grid.Row="0" Background="#252525" Padding="12,8" CornerRadius="8,8,0,0">
+          <DockPanel LastChildFill="True">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                 <TextBlock Text="Transcription Output" FontWeight="Bold" />
+                 <!-- Legend / Status icons could go here -->
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
+        <TabControl Grid.Row="1" SelectedIndex="{Binding OutputTabIndex}" Padding="0" Margin="0" VerticalContentAlignment="Stretch" HorizontalContentAlignment="Stretch">
+          <TabItem Header="Transcript">
+            <TextBox x:Name="TranscriptViewer" Classes="viewer"
+                     Text="{Binding TranscriptText}"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     CornerRadius="0"
+                     BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+          </TabItem>
+          
+          <TabItem Header="AI Summary" IsVisible="{Binding ShowSummaryTab}">
+             <TextBox x:Name="SummaryViewer" Classes="viewer"
+                     Text="{Binding SummaryText}"
+                     AcceptsReturn="True"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     CornerRadius="0"
+                     BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+          </TabItem>
+          
+          <TabItem Header="System Log">
+             <DataGrid ItemsSource="{Binding LogEntries}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        GridLinesVisibility="None"
+                        HeadersVisibility="Column"
+                        CanUserResizeColumns="True"
+                        Background="#151515">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Time" Width="80" Binding="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" />
+                  <DataGridTextColumn Header="Level" Width="70" Binding="{Binding Level}" />
+                  <DataGridTextColumn Header="Message" Width="*" Binding="{Binding Message}" />
+                </DataGrid.Columns>
+              </DataGrid>
+          </TabItem>
+        </TabControl>
+        
+        <!-- Bottom Action Bar -->
+        <Border Grid.Row="2" Background="#202020" Padding="12,8" CornerRadius="0,0,8,8" BorderBrush="#33FFFFFF" BorderThickness="0,1,0,0">
+             <StackPanel Orientation="Horizontal" Spacing="8">
+               <Button Classes="secondary" Content="Copy" Command="{Binding CopyOutputCommand}" Height="28" Padding="12,0" FontSize="12" />
+               <Button Classes="secondary" Content="Save" Command="{Binding SaveOutputCommand}" Height="28" Padding="12,0" FontSize="12" />
+               <Button Classes="secondary" Content="Clear" Command="{Binding ClearLogCommand}" IsVisible="{Binding IsLogTabSelected}" Height="28" Padding="12,0" FontSize="12" />
+            </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+
+  </Grid>
+</Window>

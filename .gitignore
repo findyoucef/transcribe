@@ -361,3 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+.gemini/
+gha-creds-*.json
+.github/commands/gemini-invoke.toml
+.github/commands/gemini-review.toml
+.github/commands/gemini-scheduled-triage.toml
+.github/commands/gemini-triage.toml
+.github/workflows/gemini-dispatch.yml
+.github/workflows/gemini-invoke.yml
+.github/workflows/gemini-review.yml
+.github/workflows/gemini-scheduled-triage.yml
+.github/workflows/gemini-triage.yml

@@ -15,16 +15,28 @@ namespace Transcribe
         private readonly List<byte> audioBuffer;
         private readonly int chunkSizeBytes;
         private readonly IAudioRecorder recorder;
-        private int audioLevelLine;
         private readonly StreamWriter transcriptWriter;
         private readonly string transcriptFileName;
         private readonly string? sourceLabel;
         private readonly bool showLevels;
-        private TimeSpan cumulativeOffset = TimeSpan.Zero;
         private Stopwatch? recordingClock;
         private readonly TranscriptionMerger? merger;
+        private readonly Action<string>? onText;
+        private readonly Action<string>? onStatus;
+        private readonly bool emitConsoleOutput;
 
-        public WhisperStreamProcessor(string modelPath, string language, IAudioRecorder recorder, int chunkSizeSeconds = 3, string? sourceLabel = null, bool showLevels = true, string? transcriptFilePath = null, TranscriptionMerger? merger = null)
+        public WhisperStreamProcessor(
+            string modelPath,
+            string language,
+            IAudioRecorder recorder,
+            int chunkSizeSeconds = 3,
+            string? sourceLabel = null,
+            bool showLevels = true,
+            string? transcriptFilePath = null,
+            TranscriptionMerger? merger = null,
+            Action<string>? onText = null,
+            Action<string>? onStatus = null,
+            bool emitConsoleOutput = true)
         {
             this.recorder = recorder;
             whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -35,6 +47,9 @@ namespace Transcribe
             this.sourceLabel = sourceLabel;
             this.showLevels = showLevels;
             this.merger = merger;
+            this.onText = onText;
+            this.onStatus = onStatus;
+            this.emitConsoleOutput = emitConsoleOutput;
             
             processingQueue = new BlockingCollection<byte[]>();
             cancellationTokenSource = new CancellationTokenSource();
@@ -67,8 +82,16 @@ namespace Transcribe
 
         public void StartProcessing()
         {
-            Console.WriteLine($"Saving transcript to: {transcriptFileName}" + (sourceLabel != null ? $" [{sourceLabel}]" : string.Empty));
-            Console.WriteLine();
+            var message = $"Saving transcript to: {transcriptFileName}" + (sourceLabel != null ? $" [{sourceLabel}]" : string.Empty);
+            if (emitConsoleOutput)
+            {
+                Console.WriteLine(message);
+                Console.WriteLine();
+            }
+            else
+            {
+                onStatus?.Invoke(message);
+            }
             
             // Start wall-clock timing
             recordingClock = Stopwatch.StartNew();
@@ -89,14 +112,17 @@ namespace Transcribe
                     var level = recorder.GetCurrentAudioLevel();
                     var barLength = Math.Min((int)(level * 50), 50);
                     var bar = new string('=', barLength).PadRight(50);
-                    
-                    if (sourceLabel != null)
+
+                    if (emitConsoleOutput)
                     {
-                        Console.WriteLine($"[{sourceLabel}] Audio level: [{bar}]");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Audio level: [{bar}]");
+                        if (sourceLabel != null)
+                        {
+                            Console.WriteLine($"[{sourceLabel}] Audio level: [{bar}]");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Audio level: [{bar}]");
+                        }
                     }
                     
                     await Task.Delay(500);
@@ -153,8 +179,16 @@ namespace Transcribe
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Processing error: {ex.Message}");
-                Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+                var message = $"Processing error: {ex.Message}";
+                if (emitConsoleOutput)
+                {
+                    Console.Error.WriteLine(message);
+                    Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+                }
+                else
+                {
+                    onStatus?.Invoke(message);
+                }
             }
         }
 
@@ -183,10 +217,16 @@ namespace Transcribe
                 if (consoleText.Count > 0)
                 {
                     var consoleOutput = string.Join(" ", consoleText);
-                    if (sourceLabel != null)
-                        Console.WriteLine($"[{sourceLabel}] {consoleOutput}");
-                    else
-                        Console.WriteLine(consoleOutput);
+
+                    var output = sourceLabel != null
+                        ? $"[{sourceLabel}] {consoleOutput}"
+                        : consoleOutput;
+
+                    onText?.Invoke(output);
+                    if (emitConsoleOutput)
+                    {
+                        Console.WriteLine(output);
+                    }
                 }
                 
                 if (items.Count > 0)
@@ -206,7 +246,15 @@ namespace Transcribe
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"\nChunk processing error: {ex.Message}");
+                var message = $"Chunk processing error: {ex.Message}";
+                if (emitConsoleOutput)
+                {
+                    Console.Error.WriteLine($"\n{message}");
+                }
+                else
+                {
+                    onStatus?.Invoke(message);
+                }
             }
         }
 

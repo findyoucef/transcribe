@@ -5,7 +5,7 @@ namespace Transcribe
 {
     public class WhisperClient
     {
-        public static async Task<string> EnsureModelDownloaded(string model)
+        public static async Task<string> EnsureModelDownloaded(string model, Action<string>? log = null)
         {
             // Determine ggml type and model file name from the provided model option
             GgmlType ggmlType;
@@ -38,21 +38,34 @@ namespace Transcribe
             // Download model if missing
             if (!File.Exists(modelPath))
             {
-                await DownloadModel(modelPath, ggmlType);
+                await DownloadModel(modelPath, ggmlType, log);
             }
 
             return modelPath;
         }
 
-        public static async Task TranscribeAudioAsync(string wavFileName, IProgress<int>? progress = null, string model = "LargeV3", string language = "en")
+        public static async Task TranscribeAudioAsync(
+            string wavFileName,
+            IProgress<int>? progress = null,
+            string model = "LargeV3",
+            string language = "en",
+            string? outputDirectory = null,
+            Action<string>? log = null)
         {
-            var txtFile = $"{Path.GetFileNameWithoutExtension(wavFileName)}.txt";
-            if (File.Exists(txtFile))
+            var baseName = Path.GetFileNameWithoutExtension(wavFileName);
+            var resolvedOutputDirectory = string.IsNullOrWhiteSpace(outputDirectory)
+                ? Directory.GetCurrentDirectory()
+                : outputDirectory;
+
+            Directory.CreateDirectory(resolvedOutputDirectory);
+
+            var txtFilePath = Path.Combine(resolvedOutputDirectory, $"{baseName}.txt");
+            if (File.Exists(txtFilePath))
             {
-                throw new InvalidOperationException($"Transcript already exists: {txtFile}");
+                throw new InvalidOperationException($"Transcript already exists: {txtFilePath}");
             }
 
-            var modelPath = await EnsureModelDownloaded(model);
+            var modelPath = await EnsureModelDownloaded(model, log);
 
             // Create factory from selected model in the binary directory
             using var whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -68,7 +81,7 @@ namespace Transcribe
 
             using var fileStream = File.OpenRead(wavFileName);
 
-            using var outputFile = new StreamWriter($"{Path.GetFileNameWithoutExtension(wavFileName)}.txt");
+            using var outputFile = new StreamWriter(txtFilePath);
             await foreach (var result in processor.ProcessAsync(fileStream))
             {
                 await outputFile.WriteLineAsync($"{result.Start}->{result.End}: {result.Text}");
@@ -113,10 +126,18 @@ namespace Transcribe
             }
         }
 
-        private static async Task DownloadModel(string modelPath, GgmlType ggmlType)
+        private static async Task DownloadModel(string modelPath, GgmlType ggmlType, Action<string>? log)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
-            Console.WriteLine($"{DateTime.Now} - Downloading Model {Path.GetFileName(modelPath)} to {Path.GetDirectoryName(modelPath)}");
+            var message = $"{DateTime.Now} - Downloading Model {Path.GetFileName(modelPath)} to {Path.GetDirectoryName(modelPath)}";
+            if (log != null)
+            {
+                log(message);
+            }
+            else
+            {
+                Console.WriteLine(message);
+            }
             using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(ggmlType);
             using var fileWriter = File.Open(modelPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             await modelStream.CopyToAsync(fileWriter);

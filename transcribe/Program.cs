@@ -53,14 +53,20 @@ namespace Transcribe
                 description: "Language code for transcription (e.g., en, fr, es). Default: en",
                 getDefaultValue: () => "en");
 
+            var outputDirOption = new Option<string?>(
+                name: "--output-dir",
+                description: "Directory to write the transcript file. Default: current working directory.",
+                getDefaultValue: () => null);
+
             var fileCommand = new Command("file", "Transcribe a WAV file")
             {
                 wavArgument,
                 modelOption,
-                languageOption
+                languageOption,
+                outputDirOption
             };
 
-            fileCommand.SetHandler(async (string wavPath, string model, string language) =>
+            fileCommand.SetHandler(async (string wavPath, string model, string language, string? outputDir) =>
             {
                 try
                 {
@@ -81,7 +87,7 @@ namespace Transcribe
                         }
                     });
 
-                    await WhisperClient.TranscribeAudioAsync(wavPath, progress, model, language);
+                    await WhisperClient.TranscribeAudioAsync(wavPath, progress, model, language, outputDirectory: outputDir);
 
                     stopwatch.Stop();
                     Console.WriteLine($"Transcription completed in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
@@ -90,7 +96,7 @@ namespace Transcribe
                 {
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
-            }, wavArgument, modelOption, languageOption);
+            }, wavArgument, modelOption, languageOption, outputDirOption);
 
             return fileCommand;
         }
@@ -122,16 +128,22 @@ namespace Transcribe
                 description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
                 getDefaultValue: () => false);
 
+            var outputDirOption = new Option<string?>(
+                name: "--output-dir",
+                description: "Directory to write the transcript file. Default: current working directory.",
+                getDefaultValue: () => null);
+
             var micCommand = new Command("mic", "Transcribe microphone input in real-time")
             {
                 modelOption,
                 languageOption,
                 chunkSizeOption,
                 deviceOption,
-                summarizeOption
+                summarizeOption,
+                outputDirOption
             };
 
-            micCommand.SetHandler(async (string model, string language, int chunkSize, int device, bool summarize) =>
+            micCommand.SetHandler(async (string model, string language, int chunkSize, int device, bool summarize, string? outputDir) =>
             {
                 try
                 {
@@ -140,7 +152,7 @@ namespace Transcribe
                     Console.WriteLine($"Starting microphone transcription using device {device}. Press Ctrl+C to stop...");
                     Console.WriteLine();
 
-                    var micTranscript = $"{Guid.NewGuid():N}.txt";
+                    var micTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
                     {
                         using var recorder = new MicrophoneRecorder(deviceNumber: device);
                         using var processor = new WhisperStreamProcessor(modelPath, language, recorder, chunkSize, transcriptFilePath: micTranscript);
@@ -186,7 +198,7 @@ namespace Transcribe
                 {
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
-            }, modelOption, languageOption, chunkSizeOption, deviceOption, summarizeOption);
+            }, modelOption, languageOption, chunkSizeOption, deviceOption, summarizeOption, outputDirOption);
 
             return micCommand;
         }
@@ -235,6 +247,11 @@ namespace Transcribe
                 description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
                 getDefaultValue: () => false);
 
+            var outputDirOption = new Option<string?>(
+                name: "--output-dir",
+                description: "Directory to write the transcript file. Default: current working directory.",
+                getDefaultValue: () => null);
+
             var speakerCommand = new Command("speaker", "Transcribe speaker/output audio and microphone in real-time")
             {
                 modelOption,
@@ -242,10 +259,11 @@ namespace Transcribe
                 chunkSizeOption,
                 deviceOption,
                 micDeviceOption,
-                summarizeOption
+                summarizeOption,
+                outputDirOption
             };
 
-            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device, int micDevice, bool summarize) =>
+            speakerCommand.SetHandler(async (string model, string language, int chunkSize, int device, int micDevice, bool summarize, string? outputDir) =>
             {
                 try
                 {
@@ -267,7 +285,7 @@ namespace Transcribe
                     using var speakerRecorder = new SpeakerRecorder(deviceNumber: device);
 
                     // Create shared transcript file path (GUID-based to match existing convention)
-                    var sharedTranscript = $"{Guid.NewGuid():N}.txt";
+                    var sharedTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
                     using var merger = new TranscriptionMerger(sharedTranscript, TimeSpan.FromSeconds(3));
 
                     // Speaker processor
@@ -336,7 +354,7 @@ namespace Transcribe
                     Console.Error.WriteLine($"Error: {ex.Message}");
                     Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
-            }, modelOption, languageOption, chunkSizeOption, deviceOption, micDeviceOption, summarizeOption);
+            }, modelOption, languageOption, chunkSizeOption, deviceOption, micDeviceOption, summarizeOption, outputDirOption);
 
             return speakerCommand;
         }
@@ -351,6 +369,17 @@ namespace Transcribe
             });
 
             return listSpeakersCommand;
+        }
+
+        private static string ResolveTranscriptPath(string fileName, string? outputDir)
+        {
+            if (string.IsNullOrWhiteSpace(outputDir))
+            {
+                return fileName;
+            }
+
+            Directory.CreateDirectory(outputDir);
+            return Path.Combine(outputDir, fileName);
         }
     }
 }

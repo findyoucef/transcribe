@@ -18,7 +18,7 @@ namespace transcribe
                     .Build();
         }
 
-        public async Task SummarizeTranscript(string transcript)
+        public async Task SummarizeTranscript(string transcript, Action<string>? onUpdate = null)
         {
             // Conversational loop that can utilize the tools via prompts.
             var messages = new List<ChatMessage>();
@@ -28,15 +28,31 @@ namespace transcribe
             await foreach (ChatResponseUpdate update in _client
                 .GetStreamingResponseAsync(messages))
             {
-                Console.Write(update);
-                updates.Add(update);
+                var text = update?.ToString() ?? string.Empty;
+                if (onUpdate != null)
+                {
+                    onUpdate(text);
+                }
+                else
+                {
+                    Console.Write(text);
+                }
+
+                if (update != null)
+                {
+                    updates.Add(update);
+                }
             }
-            Console.WriteLine();
+
+            if (onUpdate == null)
+            {
+                Console.WriteLine();
+            }
 
             messages.AddMessages(updates);
         }
 
-        public async Task SummarizeTranscript(string transcript, string outputFilePath)
+        public async Task SummarizeTranscript(string transcript, string outputFilePath, Action<string>? onUpdate = null)
         {
             if (string.IsNullOrWhiteSpace(transcript))
             {
@@ -68,8 +84,13 @@ namespace transcribe
 
             await foreach (ChatResponseUpdate update in _client.GetStreamingResponseAsync(messages))
             {
-                await writer.WriteAsync(update?.ToString() ?? string.Empty);
-                updates.Add(update);
+                var text = update?.ToString() ?? string.Empty;
+                await writer.WriteAsync(text);
+                onUpdate?.Invoke(text);
+                if (update != null)
+                {
+                    updates.Add(update);
+                }
             }
 
             await writer.FlushAsync();
