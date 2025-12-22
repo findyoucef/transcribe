@@ -84,7 +84,7 @@ Supported values (downloaded on first use into the app’s binary directory):
 - `TinyEn` (CLI default)
 
 ### Languages
-- Default is `en`. Pass ISO codes (e.g., `en`, `fr`, `es`) to `--language`.
+- Default is `en`. Pass ISO codes (e.g., `en`, `fr`, `es`) or `auto` for language detection.
 
 ## Notes
 - Network is required only for the initial model download (and Ollama summaries if enabled).

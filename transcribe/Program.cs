@@ -45,13 +45,13 @@ namespace Transcribe
 
             var modelOption = new Option<string>(
                 name: "--model",
-                description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "TinyEn");
+                description: $"Whisper model to use: {string.Join(", ", TranscribeDefaults.SupportedModels)} (default: {TranscribeDefaults.DefaultModel})",
+                getDefaultValue: () => TranscribeDefaults.DefaultModel);
 
             var languageOption = new Option<string>(
                 name: "--language",
-                description: "Language code for transcription (e.g., en, fr, es). Default: en",
-                getDefaultValue: () => "en");
+                description: $"Language code for transcription (e.g., en, fr, es) or auto. Default: {TranscribeDefaults.DefaultLanguage}",
+                getDefaultValue: () => TranscribeDefaults.DefaultLanguage);
 
             var outputDirOption = new Option<string?>(
                 name: "--output-dir",
@@ -105,18 +105,18 @@ namespace Transcribe
         {
             var modelOption = new Option<string>(
                 name: "--model",
-                description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "TinyEn");
+                description: $"Whisper model to use: {string.Join(", ", TranscribeDefaults.SupportedModels)} (default: {TranscribeDefaults.DefaultModel})",
+                getDefaultValue: () => TranscribeDefaults.DefaultModel);
 
             var languageOption = new Option<string>(
                 name: "--language",
-                description: "Language code for transcription (e.g., en, fr, es). Default: en",
-                getDefaultValue: () => "en");
+                description: $"Language code for transcription (e.g., en, fr, es) or auto. Default: {TranscribeDefaults.DefaultLanguage}",
+                getDefaultValue: () => TranscribeDefaults.DefaultLanguage);
 
             var chunkSizeOption = new Option<int>(
                 name: "--chunk-size",
-                description: "Audio chunk size in seconds for processing. Default: 3",
-                getDefaultValue: () => 3);
+                description: $"Audio chunk size in seconds for processing. Default: {TranscribeDefaults.DefaultChunkSeconds}",
+                getDefaultValue: () => TranscribeDefaults.DefaultChunkSeconds);
 
             var deviceOption = new Option<int>(
                 name: "--device",
@@ -125,7 +125,7 @@ namespace Transcribe
 
             var summarizeOption = new Option<bool>(
                 name: "--summarize",
-                description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
+                description: $"Summarize the final transcript with Ollama ({TranscribeDefaults.DefaultOllamaUrl}, model {TranscribeDefaults.DefaultOllamaModel}).",
                 getDefaultValue: () => false);
 
             var outputDirOption = new Option<string?>(
@@ -219,18 +219,18 @@ namespace Transcribe
         {
             var modelOption = new Option<string>(
                 name: "--model",
-                description: "Whisper model to use: LargeV3Turbo (default), LargeV3, BaseEn, TinyEn",
-                getDefaultValue: () => "TinyEn");
+                description: $"Whisper model to use: {string.Join(", ", TranscribeDefaults.SupportedModels)} (default: {TranscribeDefaults.DefaultModel})",
+                getDefaultValue: () => TranscribeDefaults.DefaultModel);
 
             var languageOption = new Option<string>(
                 name: "--language",
-                description: "Language code for transcription (e.g., en, fr, es). Default: en",
-                getDefaultValue: () => "en");
+                description: $"Language code for transcription (e.g., en, fr, es) or auto. Default: {TranscribeDefaults.DefaultLanguage}",
+                getDefaultValue: () => TranscribeDefaults.DefaultLanguage);
 
             var chunkSizeOption = new Option<int>(
                 name: "--chunk-size",
-                description: "Audio chunk size in seconds for processing. Default: 3",
-                getDefaultValue: () => 3);
+                description: $"Audio chunk size in seconds for processing. Default: {TranscribeDefaults.DefaultChunkSeconds}",
+                getDefaultValue: () => TranscribeDefaults.DefaultChunkSeconds);
 
             var deviceOption = new Option<int>(
                 name: "--device",
@@ -244,7 +244,7 @@ namespace Transcribe
 
             var summarizeOption = new Option<bool>(
                 name: "--summarize",
-                description: "Summarize the final transcript with Ollama (http://localhost:11434/, model tx-agent:latest).",
+                description: $"Summarize the final transcript with Ollama ({TranscribeDefaults.DefaultOllamaUrl}, model {TranscribeDefaults.DefaultOllamaModel}).",
                 getDefaultValue: () => false);
 
             var outputDirOption = new Option<string?>(

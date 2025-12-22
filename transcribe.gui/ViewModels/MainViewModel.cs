@@ -70,8 +70,8 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<DeviceItem> SpeakerDevices { get; } = new();
     public ObservableCollection<DeviceItem> MicDevices { get; } = new();
-    public ObservableCollection<string> Models { get; } = new(["TinyEn", "BaseEn", "LargeV3", "LargeV3Turbo"]);
-    public ObservableCollection<string> Languages { get; } = new(["Auto", "en", "fr", "es", "de", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "tr", "ru", "uk", "ar", "he", "hi", "ja", "ko", "zh"]);
+    public ObservableCollection<string> Models { get; } = new(TranscribeDefaults.SupportedModels);
+    public ObservableCollection<string> Languages { get; } = new(TranscribeDefaults.LanguageOptions);
 
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
 
@@ -131,7 +131,7 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref outputFolderValidationMessage, value);
     }
 
-    private int chunkSizeSeconds = 3;
+    private int chunkSizeSeconds = TranscribeDefaults.DefaultChunkSeconds;
     public int ChunkSizeSeconds
     {
         get => chunkSizeSeconds;
@@ -145,7 +145,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string selectedLanguage = "en";
+    private string selectedLanguage = TranscribeDefaults.DefaultLanguage;
     public string SelectedLanguage
     {
         get => selectedLanguage;
@@ -158,7 +158,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string selectedModel = "TinyEn";
+    private string selectedModel = TranscribeDefaults.DefaultModel;
     public string SelectedModel
     {
         get => selectedModel;
@@ -194,7 +194,7 @@ public sealed class MainViewModel : ObservableObject
     public int LogTabIndex => ShowSummaryTab ? 2 : 1;
     public bool IsLogTabSelected => OutputTabIndex == LogTabIndex;
 
-    private string ollamaUrl = DefaultOllamaUrl;
+    private string ollamaUrl = TranscribeDefaults.DefaultOllamaUrl;
     public string OllamaUrl
     {
         get => ollamaUrl;
@@ -208,7 +208,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string ollamaModel = DefaultOllamaModel;
+    private string ollamaModel = TranscribeDefaults.DefaultOllamaModel;
     public string OllamaModel
     {
         get => ollamaModel;
@@ -255,6 +255,20 @@ public sealed class MainViewModel : ObservableObject
                 ((RelayCommand)StopCommand).RaiseCanExecuteChanged();
             }
         }
+    }
+
+    private bool isFileTranscribing;
+    public bool IsFileTranscribing
+    {
+        get => isFileTranscribing;
+        private set => SetProperty(ref isFileTranscribing, value);
+    }
+
+    private int fileProgressPercent;
+    public int FileProgressPercent
+    {
+        get => fileProgressPercent;
+        private set => SetProperty(ref fileProgressPercent, value);
     }
 
     private string stateText = "Idle";
@@ -351,9 +365,6 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand TranscribeWavCommand { get; }
     public RelayCommand OpenOutputFolderCommand { get; }
 
-    public const string DefaultOllamaUrl = "http://localhost:11434/";
-    public const string DefaultOllamaModel = "tx-agent:latest";
-
     public MainViewModel(IWindowServices services)
     {
         this.services = services;
@@ -376,11 +387,11 @@ public sealed class MainViewModel : ObservableObject
 
         if (!OperatingSystem.IsWindows())
         {
-            LogInfo("Live capture is Windows-only; file transcription is available via File → Transcribe WAV…");
+            LogInfo("Live capture is Windows-only; file transcription is available via File -> Transcribe WAV...");
         }
 
-        SelectedLanguage = "en";
-        SelectedModel = "TinyEn";
+        SelectedLanguage = TranscribeDefaults.DefaultLanguage;
+        SelectedModel = TranscribeDefaults.DefaultModel;
         SelectedMicDevice = new DeviceItem(-1, "Disabled");
         RefreshDevices();
 
@@ -400,6 +411,17 @@ public sealed class MainViewModel : ObservableObject
         Dispatcher.UIThread.Post(action);
     }
 
+    private void SetFileProgress(int percent)
+    {
+        var clamped = Math.Clamp(percent, 0, 100);
+        RunOnUi(() => FileProgressPercent = clamped);
+    }
+
+    private void SetFileTranscribing(bool isTranscribing)
+    {
+        RunOnUi(() => IsFileTranscribing = isTranscribing);
+    }
+
     private void RaiseCanStartChanged()
     {
         RaisePropertyChanged(nameof(CanStart));
@@ -411,15 +433,17 @@ public sealed class MainViewModel : ObservableObject
     private void ResetDefaults()
     {
         WavFilePath = "";
-        ChunkSizeSeconds = 3;
-        SelectedLanguage = "en";
-        SelectedModel = "TinyEn";
+        ChunkSizeSeconds = TranscribeDefaults.DefaultChunkSeconds;
+        SelectedLanguage = TranscribeDefaults.DefaultLanguage;
+        SelectedModel = TranscribeDefaults.DefaultModel;
         SummarizeWithOllama = false;
-        OllamaUrl = DefaultOllamaUrl;
-        OllamaModel = DefaultOllamaModel;
+        OllamaUrl = TranscribeDefaults.DefaultOllamaUrl;
+        OllamaModel = TranscribeDefaults.DefaultOllamaModel;
         OutputFolder = "";
         ConnectionStatusText = "Not tested";
         IsOllamaConnected = null;
+        FileProgressPercent = 0;
+        IsFileTranscribing = false;
         RaiseCanStartChanged();
         LogInfo("Reset to defaults.");
     }
@@ -671,10 +695,7 @@ public sealed class MainViewModel : ObservableObject
 
     private string ResolveLanguage()
     {
-        var value = (SelectedLanguage ?? "Auto").Trim();
-        return string.Equals(value, "Auto", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(value)
-            ? "en"
-            : value;
+        return TranscribeDefaults.NormalizeLanguage(SelectedLanguage);
     }
 
     private async Task StartAsync()
@@ -723,7 +744,8 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             LogError($"Start failed: {ex.Message}");
-            StateText = "Error";
+            StateText = $"Error: {ex.Message}";
+            OutputTabIndex = LogTabIndex;
             await StopAsync();
         }
     }
@@ -732,10 +754,32 @@ public sealed class MainViewModel : ObservableObject
     {
         var wav = WavFilePath;
         var outputDir = string.IsNullOrWhiteSpace(OutputFolder) ? Path.GetDirectoryName(wav) : OutputFolder;
-        var progress = new Progress<int>(_ => { });
+        var progress = new Progress<int>(percent => SetFileProgress(percent));
+        SetFileProgress(0);
+        SetFileTranscribing(true);
+        var completed = false;
 
         LogInfo($"Transcribing file: {Path.GetFileName(wav)}");
-        await WhisperClient.TranscribeAudioAsync(wav, progress, SelectedModel, language, outputDirectory: outputDir, log: LogInfo);
+        try
+        {
+            await Task.Run(() => WhisperClient.TranscribeAudioAsync(
+                wav,
+                progress,
+                SelectedModel,
+                language,
+                outputDirectory: outputDir,
+                log: LogInfo,
+                onSegment: AppendTranscriptLineNoLog));
+            completed = true;
+        }
+        finally
+        {
+            if (completed)
+            {
+                SetFileProgress(100);
+            }
+            SetFileTranscribing(false);
+        }
 
         var txtPath = Path.Combine(outputDir ?? Directory.GetCurrentDirectory(), $"{Path.GetFileNameWithoutExtension(wav)}.txt");
         transcriptPath = txtPath;
@@ -850,12 +894,21 @@ public sealed class MainViewModel : ObservableObject
         // Nothing to stop in file mode; it completes synchronously.
         if (SelectedModeIndex == 0)
         {
+            timer.Stop();
+            startedAt = null;
+            RaisePropertyChanged(nameof(ElapsedText));
+            RaisePropertyChanged(nameof(RunStatusLine));
+
+            IsRunning = false;
+            var isError = StateText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(StateText, "Error", StringComparison.OrdinalIgnoreCase);
+            StateText = isError ? StateText : "Idle";
             return;
         }
 
         try
         {
-            LogInfo("Stopping…");
+            LogInfo("Stopping...");
 
             speakerRecorder?.StopRecording();
             micRecorder?.StopRecording();
@@ -894,7 +947,9 @@ public sealed class MainViewModel : ObservableObject
             RaisePropertyChanged(nameof(RunStatusLine));
 
             IsRunning = false;
-            StateText = StateText == "Error" ? "Error" : "Idle";
+            var isError = StateText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(StateText, "Error", StringComparison.OrdinalIgnoreCase);
+            StateText = isError ? StateText : "Idle";
         }
 
         if (SummarizeWithOllama && transcriptPath != null && File.Exists(transcriptPath))
@@ -914,19 +969,36 @@ public sealed class MainViewModel : ObservableObject
 
         try
         {
-            LogInfo("Summarizing with Ollama…");
+            LogInfo("Summarizing with Ollama...");
             var transcript = await File.ReadAllTextAsync(path);
             summaryBuilder.Clear();
             RunOnUi(() => SummaryText = "");
             OutputTabIndex = 1;
 
-            var ollama = new transcribe.OllamaClient(OllamaUrl.Trim(), (OllamaModel ?? DefaultOllamaModel).Trim());
+            var model = string.IsNullOrWhiteSpace(OllamaModel)
+                ? TranscribeDefaults.DefaultOllamaModel
+                : OllamaModel.Trim();
+            var ollama = new transcribe.OllamaClient(OllamaUrl.Trim(), model);
             await ollama.SummarizeTranscript(transcript, AppendSummaryRaw);
         }
         catch (Exception ex)
         {
             LogError($"Summarization error: {ex.Message}");
         }
+    }
+
+    private void AppendTranscriptLineNoLog(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+
+        RunOnUi(() =>
+        {
+            transcriptBuilder.AppendLine(line);
+            TranscriptText = transcriptBuilder.ToString();
+        });
     }
 
     private void AppendTranscriptLine(string line)
@@ -977,7 +1049,7 @@ public sealed class MainViewModel : ObservableObject
 
         try
         {
-            ConnectionStatusText = "Testing…";
+            ConnectionStatusText = "Testing...";
             IsOllamaConnected = null;
 
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
@@ -1057,15 +1129,28 @@ public sealed class MainViewModel : ObservableObject
         TranscriptText = "";
         SummaryText = "";
         OutputTabIndex = 0;
+        transcriptBuilder.Clear();
+        summaryBuilder.Clear();
 
         var outputDir = string.IsNullOrWhiteSpace(OutputFolder) ? Path.GetDirectoryName(wav) : OutputFolder;
         var language = ResolveLanguage();
-        var progress = new Progress<int>(_ => { });
+        var progress = new Progress<int>(percent => SetFileProgress(percent));
+        SetFileProgress(0);
+        SetFileTranscribing(true);
+        var completed = false;
 
         try
         {
             LogInfo($"Transcribing file: {Path.GetFileName(wav)}");
-            await WhisperClient.TranscribeAudioAsync(wav, progress, SelectedModel, language, outputDirectory: outputDir, log: LogInfo);
+            await Task.Run(() => WhisperClient.TranscribeAudioAsync(
+                wav,
+                progress,
+                SelectedModel,
+                language,
+                outputDirectory: outputDir,
+                log: LogInfo,
+                onSegment: AppendTranscriptLineNoLog));
+            completed = true;
 
             var txtPath = Path.Combine(outputDir ?? Directory.GetCurrentDirectory(), $"{Path.GetFileNameWithoutExtension(wav)}.txt");
             if (File.Exists(txtPath))
@@ -1078,6 +1163,14 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             LogError($"File transcription error: {ex.Message}");
+        }
+        finally
+        {
+            if (completed)
+            {
+                SetFileProgress(100);
+            }
+            SetFileTranscribing(false);
         }
     }
 
@@ -1105,3 +1198,5 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 }
+
+

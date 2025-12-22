@@ -10,7 +10,8 @@ namespace Transcribe
             // Determine ggml type and model file name from the provided model option
             GgmlType ggmlType;
             string modelFileName;
-            switch (model.Trim())
+            var normalizedModel = string.IsNullOrWhiteSpace(model) ? TranscribeDefaults.DefaultModel : model.Trim();
+            switch (normalizedModel)
             {
                 case "LargeV3Turbo":
                     ggmlType = GgmlType.LargeV3Turbo;
@@ -47,10 +48,11 @@ namespace Transcribe
         public static async Task TranscribeAudioAsync(
             string wavFileName,
             IProgress<int>? progress = null,
-            string model = "LargeV3",
-            string language = "en",
+            string model = TranscribeDefaults.DefaultModel,
+            string language = TranscribeDefaults.DefaultLanguage,
             string? outputDirectory = null,
-            Action<string>? log = null)
+            Action<string>? log = null,
+            Action<string>? onSegment = null)
         {
             var baseName = Path.GetFileNameWithoutExtension(wavFileName);
             var resolvedOutputDirectory = string.IsNullOrWhiteSpace(outputDirectory)
@@ -71,8 +73,9 @@ namespace Transcribe
             using var whisperFactory = WhisperFactory.FromPath(modelPath);
 
             // Build processor with selected language
+            var resolvedLanguage = TranscribeDefaults.NormalizeLanguage(language);
             using var processor = whisperFactory.CreateBuilder()
-                .WithLanguage(string.IsNullOrWhiteSpace(language) ? "en" : language)
+                .WithLanguage(resolvedLanguage)
                 .Build();
 
             // Read WAV duration from header to drive progress
@@ -84,7 +87,9 @@ namespace Transcribe
             using var outputFile = new StreamWriter(txtFilePath);
             await foreach (var result in processor.ProcessAsync(fileStream))
             {
-                await outputFile.WriteLineAsync($"{result.Start}->{result.End}: {result.Text}");
+                var line = $"{result.Start}->{result.End}: {result.Text}";
+                await outputFile.WriteLineAsync(line);
+                onSegment?.Invoke(line);
 
                 if (progress != null && totalDurationMs > 0)
                 {

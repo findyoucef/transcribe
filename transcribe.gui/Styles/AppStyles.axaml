@@ -68,6 +68,18 @@
     <Setter Property="Height" Value="{DynamicResource ControlHeight}" />
   </Style>
 
+  <Style Selector="DataGrid">
+    <Setter Property="Foreground" Value="#E0E0E0" />
+  </Style>
+
+  <Style Selector="DataGridCell">
+    <Setter Property="Foreground" Value="#E0E0E0" />
+  </Style>
+
+  <Style Selector="DataGridColumnHeader">
+    <Setter Property="Foreground" Value="#D0D0D0" />
+  </Style>
+
   <!-- Buttons -->
   <Style Selector="Button">
     <Setter Property="CornerRadius" Value="4" />

@@ -1,5 +1,4 @@
 using Whisper.net;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 
 namespace Transcribe
@@ -8,7 +7,6 @@ namespace Transcribe
     {
         private readonly WhisperFactory whisperFactory;
         private readonly WhisperProcessor processor;
-        private readonly BlockingCollection<byte[]> processingQueue;
         private readonly CancellationTokenSource cancellationTokenSource;
         private Task? processingTask;
         private Task? visualizationTask;
@@ -29,7 +27,7 @@ namespace Transcribe
             string modelPath,
             string language,
             IAudioRecorder recorder,
-            int chunkSizeSeconds = 3,
+            int chunkSizeSeconds = TranscribeDefaults.DefaultChunkSeconds,
             string? sourceLabel = null,
             bool showLevels = true,
             string? transcriptFilePath = null,
@@ -40,8 +38,9 @@ namespace Transcribe
         {
             this.recorder = recorder;
             whisperFactory = WhisperFactory.FromPath(modelPath);
+            var resolvedLanguage = TranscribeDefaults.NormalizeLanguage(language);
             processor = whisperFactory.CreateBuilder()
-                .WithLanguage(language)
+                .WithLanguage(resolvedLanguage)
                 .Build();
             
             this.sourceLabel = sourceLabel;
@@ -51,7 +50,6 @@ namespace Transcribe
             this.onStatus = onStatus;
             this.emitConsoleOutput = emitConsoleOutput;
             
-            processingQueue = new BlockingCollection<byte[]>();
             cancellationTokenSource = new CancellationTokenSource();
             audioBuffer = new List<byte>();
             
@@ -281,7 +279,6 @@ namespace Transcribe
             
             processor?.Dispose();
             whisperFactory?.Dispose();
-            processingQueue.Dispose();
             cancellationTokenSource.Dispose();
         }
     }
