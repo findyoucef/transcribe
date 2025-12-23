@@ -1,0 +1,14 @@
+{
+  "inputName": null,
+  "outputName": null,
+  "inputLayout": "Auto",
+  "inputType": "logmel",
+  "sampleRate": 16000,
+  "melBins": 80,
+  "frameMs": 25,
+  "hopMs": 10,
+  "applyPreEmphasis": true,
+  "preEmphasis": 0.97,
+  "applyMeanNormalization": true,
+  "applyVarianceNormalization": false
+}

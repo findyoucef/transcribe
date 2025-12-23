@@ -171,6 +171,286 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private bool enableDiarization;
+    public bool EnableDiarization
+    {
+        get => enableDiarization;
+        set
+        {
+            if (SetProperty(ref enableDiarization, value))
+            {
+                RaisePropertyChanged(nameof(ShowDiarizationSettings));
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    public bool ShowDiarizationSettings => EnableDiarization;
+
+    private string diarizationModelPath = "";
+    public string DiarizationModelPath
+    {
+        get => diarizationModelPath;
+        set
+        {
+            if (SetProperty(ref diarizationModelPath, value))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private string diarizationModelUrl = "";
+    public string DiarizationModelUrl
+    {
+        get => diarizationModelUrl;
+        set
+        {
+            if (SetProperty(ref diarizationModelUrl, value))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private string diarizationConfigPath = "";
+    public string DiarizationConfigPath
+    {
+        get => diarizationConfigPath;
+        set
+        {
+            if (SetProperty(ref diarizationConfigPath, value))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationSimilarityThreshold = TranscribeDefaults.DefaultDiarizationSimilarityThreshold;
+    public double DiarizationSimilarityThreshold
+    {
+        get => diarizationSimilarityThreshold;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.3, 0.95);
+            if (SetProperty(ref diarizationSimilarityThreshold, clamped))
+            {
+                if (DiarizationInstantSwitchSimilarity < diarizationSimilarityThreshold)
+                {
+                    DiarizationInstantSwitchSimilarity = diarizationSimilarityThreshold;
+                }
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationFallbackSimilarityThreshold = TranscribeDefaults.DefaultDiarizationFallbackSimilarity;
+    public double DiarizationFallbackSimilarityThreshold
+    {
+        get => diarizationFallbackSimilarityThreshold;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.3, 0.9);
+            if (SetProperty(ref diarizationFallbackSimilarityThreshold, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationActiveMatchMargin = TranscribeDefaults.DefaultDiarizationActiveMatchMargin;
+    public double DiarizationActiveMatchMargin
+    {
+        get => diarizationActiveMatchMargin;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.0, 0.3);
+            if (SetProperty(ref diarizationActiveMatchMargin, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationInstantSwitchSimilarity = TranscribeDefaults.DefaultDiarizationInstantSwitchSimilarity;
+    public double DiarizationInstantSwitchSimilarity
+    {
+        get => diarizationInstantSwitchSimilarity;
+        set
+        {
+            var min = DiarizationSimilarityThreshold;
+            var clamped = Math.Clamp(value, min, 0.95);
+            if (SetProperty(ref diarizationInstantSwitchSimilarity, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationEnergyThreshold = TranscribeDefaults.DefaultDiarizationEnergyThreshold;
+    public double DiarizationEnergyThreshold
+    {
+        get => diarizationEnergyThreshold;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.001, 0.05);
+            if (SetProperty(ref diarizationEnergyThreshold, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private int diarizationMinSpeechMs = TranscribeDefaults.DefaultDiarizationMinSpeechMs;
+    public int DiarizationMinSpeechMs
+    {
+        get => diarizationMinSpeechMs;
+        set
+        {
+            var clamped = Math.Clamp(value, 100, 5000);
+            if (SetProperty(ref diarizationMinSpeechMs, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private int diarizationMinSilenceMs = TranscribeDefaults.DefaultDiarizationMinSilenceMs;
+    public int DiarizationMinSilenceMs
+    {
+        get => diarizationMinSilenceMs;
+        set
+        {
+            var clamped = Math.Clamp(value, 100, 5000);
+            if (SetProperty(ref diarizationMinSilenceMs, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private int diarizationMaxSegmentSeconds = TranscribeDefaults.DefaultDiarizationMaxSegmentSeconds;
+    public int DiarizationMaxSegmentSeconds
+    {
+        get => diarizationMaxSegmentSeconds;
+        set
+        {
+            var clamped = Math.Clamp(value, 2, 60);
+            if (SetProperty(ref diarizationMaxSegmentSeconds, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationWindowSeconds = TranscribeDefaults.DefaultDiarizationWindowSeconds;
+    public double DiarizationWindowSeconds
+    {
+        get => diarizationWindowSeconds;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.5, 5.0);
+            if (SetProperty(ref diarizationWindowSeconds, clamped))
+            {
+                if (DiarizationWindowHopSeconds > diarizationWindowSeconds)
+                {
+                    DiarizationWindowHopSeconds = diarizationWindowSeconds;
+                }
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationWindowHopSeconds = TranscribeDefaults.DefaultDiarizationWindowHopSeconds;
+    public double DiarizationWindowHopSeconds
+    {
+        get => diarizationWindowHopSeconds;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.1, DiarizationWindowSeconds);
+            if (SetProperty(ref diarizationWindowHopSeconds, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private int diarizationMinSpeakerWindows = TranscribeDefaults.DefaultDiarizationMinSpeakerWindows;
+    public int DiarizationMinSpeakerWindows
+    {
+        get => diarizationMinSpeakerWindows;
+        set
+        {
+            var clamped = Math.Clamp(value, 1, 20);
+            if (SetProperty(ref diarizationMinSpeakerWindows, clamped))
+            {
+                if (DiarizationMinNewSpeakerWindows < diarizationMinSpeakerWindows)
+                {
+                    DiarizationMinNewSpeakerWindows = diarizationMinSpeakerWindows;
+                }
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private int diarizationMinNewSpeakerWindows = TranscribeDefaults.DefaultDiarizationMinNewSpeakerWindows;
+    public int DiarizationMinNewSpeakerWindows
+    {
+        get => diarizationMinNewSpeakerWindows;
+        set
+        {
+            var clamped = Math.Clamp(value, DiarizationMinSpeakerWindows, 20);
+            if (SetProperty(ref diarizationMinNewSpeakerWindows, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationOverlapMinSimilarity = TranscribeDefaults.DefaultDiarizationOverlapMinSimilarity;
+    public double DiarizationOverlapMinSimilarity
+    {
+        get => diarizationOverlapMinSimilarity;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.3, 0.95);
+            if (SetProperty(ref diarizationOverlapMinSimilarity, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private double diarizationOverlapMaxGap = TranscribeDefaults.DefaultDiarizationOverlapMaxGap;
+    public double DiarizationOverlapMaxGap
+    {
+        get => diarizationOverlapMaxGap;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.0, 0.3);
+            if (SetProperty(ref diarizationOverlapMaxGap, clamped))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    private bool diarizationLogScores;
+    public bool DiarizationLogScores
+    {
+        get => diarizationLogScores;
+        set
+        {
+            if (SetProperty(ref diarizationLogScores, value))
+            {
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    public string DefaultDiarizationModelPath => DiarizationModelLoader.GetDefaultModelPath();
+    public string DefaultDiarizationConfigPath => DiarizationModelLoader.GetDefaultConfigPath();
+
     private bool summarizeWithOllama;
     public bool SummarizeWithOllama
     {
@@ -436,6 +716,25 @@ public sealed class MainViewModel : ObservableObject
         ChunkSizeSeconds = TranscribeDefaults.DefaultChunkSeconds;
         SelectedLanguage = TranscribeDefaults.DefaultLanguage;
         SelectedModel = TranscribeDefaults.DefaultModel;
+        EnableDiarization = false;
+        DiarizationModelPath = "";
+        DiarizationModelUrl = "";
+        DiarizationConfigPath = "";
+        DiarizationSimilarityThreshold = TranscribeDefaults.DefaultDiarizationSimilarityThreshold;
+        DiarizationFallbackSimilarityThreshold = TranscribeDefaults.DefaultDiarizationFallbackSimilarity;
+        DiarizationActiveMatchMargin = TranscribeDefaults.DefaultDiarizationActiveMatchMargin;
+        DiarizationInstantSwitchSimilarity = TranscribeDefaults.DefaultDiarizationInstantSwitchSimilarity;
+        DiarizationEnergyThreshold = TranscribeDefaults.DefaultDiarizationEnergyThreshold;
+        DiarizationMinSpeechMs = TranscribeDefaults.DefaultDiarizationMinSpeechMs;
+        DiarizationMinSilenceMs = TranscribeDefaults.DefaultDiarizationMinSilenceMs;
+        DiarizationMaxSegmentSeconds = TranscribeDefaults.DefaultDiarizationMaxSegmentSeconds;
+        DiarizationWindowSeconds = TranscribeDefaults.DefaultDiarizationWindowSeconds;
+        DiarizationWindowHopSeconds = TranscribeDefaults.DefaultDiarizationWindowHopSeconds;
+        DiarizationMinSpeakerWindows = TranscribeDefaults.DefaultDiarizationMinSpeakerWindows;
+        DiarizationMinNewSpeakerWindows = TranscribeDefaults.DefaultDiarizationMinNewSpeakerWindows;
+        DiarizationOverlapMinSimilarity = TranscribeDefaults.DefaultDiarizationOverlapMinSimilarity;
+        DiarizationOverlapMaxGap = TranscribeDefaults.DefaultDiarizationOverlapMaxGap;
+        DiarizationLogScores = false;
         SummarizeWithOllama = false;
         OllamaUrl = TranscribeDefaults.DefaultOllamaUrl;
         OllamaModel = TranscribeDefaults.DefaultOllamaModel;
@@ -671,6 +970,17 @@ public sealed class MainViewModel : ObservableObject
             return false;
         }
 
+        if (EnableDiarization)
+        {
+            var modelPath = ResolveDiarizationModelPath();
+            var modelUrl = NormalizeOptional(DiarizationModelUrl);
+            if (string.IsNullOrWhiteSpace(modelUrl) && !File.Exists(modelPath))
+            {
+                reason = "Diarization model is missing. Provide a model path or URL.";
+                return false;
+            }
+        }
+
         if (SummarizeWithOllama && !IsOllamaUrlValid)
         {
             reason = "Fix Ollama URL.";
@@ -696,6 +1006,48 @@ public sealed class MainViewModel : ObservableObject
     private string ResolveLanguage()
     {
         return TranscribeDefaults.NormalizeLanguage(SelectedLanguage);
+    }
+
+    private DiarizationOptions BuildDiarizationOptions()
+    {
+        return new DiarizationOptions
+        {
+            Enabled = EnableDiarization,
+            ModelPath = NormalizeOptional(DiarizationModelPath),
+            ModelUrl = NormalizeOptional(DiarizationModelUrl),
+            ConfigPath = NormalizeOptional(DiarizationConfigPath),
+            SimilarityThreshold = (float)DiarizationSimilarityThreshold,
+            FallbackSimilarityThreshold = (float)DiarizationFallbackSimilarityThreshold,
+            ActiveMatchMargin = (float)DiarizationActiveMatchMargin,
+            InstantSwitchSimilarity = (float)DiarizationInstantSwitchSimilarity,
+            EnergyThreshold = (float)DiarizationEnergyThreshold,
+            MinSpeechMs = DiarizationMinSpeechMs,
+            MinSilenceMs = DiarizationMinSilenceMs,
+            MaxSegmentSeconds = DiarizationMaxSegmentSeconds,
+            WindowSeconds = (float)DiarizationWindowSeconds,
+            WindowHopSeconds = (float)DiarizationWindowHopSeconds,
+            MinSpeakerWindows = DiarizationMinSpeakerWindows,
+            MinNewSpeakerWindows = DiarizationMinNewSpeakerWindows,
+            OverlapMinSimilarity = (float)DiarizationOverlapMinSimilarity,
+            OverlapMaxGap = (float)DiarizationOverlapMaxGap,
+            LogScores = DiarizationLogScores
+        };
+    }
+
+    private string ResolveDiarizationModelPath()
+    {
+        var path = NormalizeOptional(DiarizationModelPath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return DiarizationModelLoader.GetDefaultModelPath();
+        }
+
+        return Path.IsPathRooted(path) ? path : Path.GetFullPath(path);
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private async Task StartAsync()
@@ -758,6 +1110,7 @@ public sealed class MainViewModel : ObservableObject
         SetFileProgress(0);
         SetFileTranscribing(true);
         var completed = false;
+        var diarizationOptions = BuildDiarizationOptions();
 
         LogInfo($"Transcribing file: {Path.GetFileName(wav)}");
         try
@@ -769,7 +1122,8 @@ public sealed class MainViewModel : ObservableObject
                 language,
                 outputDirectory: outputDir,
                 log: LogInfo,
-                onSegment: AppendTranscriptLineNoLog));
+                onSegment: AppendTranscriptLineNoLog,
+                diarizationOptions: diarizationOptions));
             completed = true;
         }
         finally
@@ -813,22 +1167,46 @@ public sealed class MainViewModel : ObservableObject
         transcriptPath = ResolveTranscriptPath();
         LogInfo($"Saving transcript to: {transcriptPath}");
 
-        var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
-        micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
-        micProcessor = new WhisperStreamProcessor(
-            modelPath,
-            language,
-            micRecorder,
-            chunkSizeSeconds: ChunkSizeSeconds,
-            sourceLabel: "MIC",
-            showLevels: false,
-            transcriptFilePath: transcriptPath,
-            onText: AppendTranscriptLine,
-            onStatus: LogInfo,
-            emitConsoleOutput: false);
+        var diarizationOptions = BuildDiarizationOptions();
+        DiarizationResources? diarizationResources = null;
+        if (diarizationOptions.Enabled)
+        {
+            diarizationResources = await DiarizationModelLoader.EnsureResourcesAsync(diarizationOptions, LogInfo);
+        }
 
-        micRecorder.StartRecording();
-        micProcessor.StartProcessing();
+        var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
+        DiarizationPipeline? diarization = null;
+        try
+        {
+            if (diarizationResources != null)
+            {
+                var diarizationModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
+                diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
+            }
+
+            micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+            micProcessor = new WhisperStreamProcessor(
+                modelPath,
+                language,
+                micRecorder,
+                chunkSizeSeconds: ChunkSizeSeconds,
+                sourceLabel: "MIC",
+                showLevels: false,
+                transcriptFilePath: transcriptPath,
+                onText: AppendTranscriptLine,
+                onStatus: LogInfo,
+                emitConsoleOutput: false,
+                diarization: diarization);
+
+            micRecorder.StartRecording();
+            micProcessor.StartProcessing();
+
+            diarization = null;
+        }
+        finally
+        {
+            diarization?.Dispose();
+        }
     }
 
     private async Task StartSpeakerAsync(string language)
@@ -839,48 +1217,82 @@ public sealed class MainViewModel : ObservableObject
         transcriptPath = ResolveTranscriptPath();
         LogInfo($"Saving transcript to: {transcriptPath}");
 
+        var diarizationOptions = BuildDiarizationOptions();
+        DiarizationResources? diarizationResources = null;
+        if (diarizationOptions.Enabled)
+        {
+            diarizationResources = await DiarizationModelLoader.EnsureResourcesAsync(diarizationOptions, LogInfo);
+        }
+
         var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
 
         speakerRecorder = new SpeakerRecorder(deviceNumber: speakerIndex);
         merger = new TranscriptionMerger(transcriptPath, TimeSpan.FromSeconds(3));
 
-        speakerProcessor = new WhisperStreamProcessor(
-            modelPath,
-            language,
-            speakerRecorder,
-            chunkSizeSeconds: ChunkSizeSeconds,
-            sourceLabel: "SPK",
-            showLevels: false,
-            transcriptFilePath: transcriptPath,
-            merger: merger,
-            onText: AppendTranscriptLine,
-            onStatus: LogInfo,
-            emitConsoleOutput: false);
-
-        if (micIndex >= 0)
+        DiarizationPipeline? speakerDiarization = null;
+        DiarizationPipeline? micDiarization = null;
+        try
         {
-            micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
-            micProcessor = new WhisperStreamProcessor(
+            if (diarizationResources != null)
+            {
+                var diarizationModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
+                speakerDiarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
+            }
+
+            speakerProcessor = new WhisperStreamProcessor(
                 modelPath,
                 language,
-                micRecorder,
+                speakerRecorder,
                 chunkSizeSeconds: ChunkSizeSeconds,
-                sourceLabel: "MIC",
+                sourceLabel: "SPK",
                 showLevels: false,
                 transcriptFilePath: transcriptPath,
                 merger: merger,
                 onText: AppendTranscriptLine,
                 onStatus: LogInfo,
-                emitConsoleOutput: false);
+                emitConsoleOutput: false,
+                diarization: speakerDiarization);
+
+            if (micIndex >= 0)
+            {
+                micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+                if (diarizationResources != null)
+                {
+                    var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
+                    micDiarization = new DiarizationPipeline(micModel, diarizationOptions, LogInfo);
+                }
+
+                micProcessor = new WhisperStreamProcessor(
+                    modelPath,
+                    language,
+                    micRecorder,
+                    chunkSizeSeconds: ChunkSizeSeconds,
+                    sourceLabel: "MIC",
+                    showLevels: false,
+                    transcriptFilePath: transcriptPath,
+                    merger: merger,
+                    onText: AppendTranscriptLine,
+                    onStatus: LogInfo,
+                    emitConsoleOutput: false,
+                    diarization: micDiarization);
+            }
+
+            speakerRecorder.StartRecording();
+            speakerProcessor.StartProcessing();
+
+            if (micRecorder != null && micProcessor != null)
+            {
+                micRecorder.StartRecording();
+                micProcessor.StartProcessing();
+            }
+
+            speakerDiarization = null;
+            micDiarization = null;
         }
-
-        speakerRecorder.StartRecording();
-        speakerProcessor.StartProcessing();
-
-        if (micRecorder != null && micProcessor != null)
+        finally
         {
-            micRecorder.StartRecording();
-            micProcessor.StartProcessing();
+            micDiarization?.Dispose();
+            speakerDiarization?.Dispose();
         }
     }
 
@@ -1138,6 +1550,7 @@ public sealed class MainViewModel : ObservableObject
         SetFileProgress(0);
         SetFileTranscribing(true);
         var completed = false;
+        var diarizationOptions = BuildDiarizationOptions();
 
         try
         {
@@ -1149,7 +1562,8 @@ public sealed class MainViewModel : ObservableObject
                 language,
                 outputDirectory: outputDir,
                 log: LogInfo,
-                onSegment: AppendTranscriptLineNoLog));
+                onSegment: AppendTranscriptLineNoLog,
+                diarizationOptions: diarizationOptions));
             completed = true;
 
             var txtPath = Path.Combine(outputDir ?? Directory.GetCurrentDirectory(), $"{Path.GetFileNameWithoutExtension(wav)}.txt");

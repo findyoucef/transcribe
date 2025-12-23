@@ -23,4 +23,8 @@
     <ProjectReference Include="..\transcribe\transcribe.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\transcribe\models\ecapa-tdnn.json" Link="models\ecapa-tdnn.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

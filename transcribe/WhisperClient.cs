@@ -52,7 +52,8 @@ namespace Transcribe
             string language = TranscribeDefaults.DefaultLanguage,
             string? outputDirectory = null,
             Action<string>? log = null,
-            Action<string>? onSegment = null)
+            Action<string>? onSegment = null,
+            DiarizationOptions? diarizationOptions = null)
         {
             var baseName = Path.GetFileNameWithoutExtension(wavFileName);
             var resolvedOutputDirectory = string.IsNullOrWhiteSpace(outputDirectory)
@@ -78,16 +79,35 @@ namespace Transcribe
                 .WithLanguage(resolvedLanguage)
                 .Build();
 
-            // Read WAV duration from header to drive progress
+            // Read WAV duration to drive progress
             long totalDurationMs = GetWavDurationMilliseconds(wavFileName);
             int lastPercent = -1;
 
             using var fileStream = File.OpenRead(wavFileName);
 
             using var outputFile = new StreamWriter(txtFilePath);
+
+            const int diarizationProgressSpan = 15;
+            var transcriptionProgressStart = 0;
+            DiarizationTimeline? timeline = null;
+            if (diarizationOptions?.Enabled == true)
+            {
+                timeline = await BuildDiarizationTimelineAsync(
+                    wavFileName,
+                    diarizationOptions,
+                    log,
+                    progress,
+                    0,
+                    diarizationProgressSpan);
+                transcriptionProgressStart = diarizationProgressSpan;
+            }
+
             await foreach (var result in processor.ProcessAsync(fileStream))
             {
-                var line = $"{result.Start}->{result.End}: {result.Text}";
+                var trimmed = result.Text.Trim();
+                var speakerLabel = timeline?.GetSpeakerLabel(result.Start, result.End);
+                var taggedText = TranscriptionTagger.ApplyTags(trimmed, null, speakerLabel);
+                var line = $"{result.Start}->{result.End}: {taggedText}";
                 await outputFile.WriteLineAsync(line);
                 onSegment?.Invoke(line);
 
@@ -97,8 +117,13 @@ namespace Transcribe
                     if (percent > lastPercent && percent < 100)
                     {
                         lastPercent = percent;
-                        progress.Report(percent);
+                        progress.Report(MapProgress(percent, transcriptionProgressStart, 100));
                     }
+                }
+                else if (progress != null && totalDurationMs <= 0 && !string.IsNullOrWhiteSpace(result.Text))
+                {
+                    lastPercent = Math.Min(99, lastPercent + 1);
+                    progress.Report(MapProgress(lastPercent, transcriptionProgressStart, 100));
                 }
             }
 
@@ -110,10 +135,72 @@ namespace Transcribe
             }
         }
 
+        private static async Task<DiarizationTimeline?> BuildDiarizationTimelineAsync(
+            string wavFileName,
+            DiarizationOptions options,
+            Action<string>? log,
+            IProgress<int>? progress,
+            int progressStart,
+            int progressEnd)
+        {
+            log?.Invoke("Running diarization...");
+
+            var resources = await DiarizationModelLoader.EnsureResourcesAsync(options, log);
+            using var model = new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, log);
+            var session = new DiarizationSession(model, options, log);
+
+            progress?.Report(progressStart);
+
+            var samples = AudioUtils.ReadAudioFileAsMono(wavFileName, resources.Config.SampleRate);
+            if (samples.Length == 0)
+            {
+                log?.Invoke("Diarization skipped: no audio samples.");
+                progress?.Report(progressEnd);
+                return session.Timeline;
+            }
+
+            var sampleRate = resources.Config.SampleRate;
+            var totalSamples = samples.Length;
+            var chunkSamples = Math.Max(sampleRate, sampleRate * TranscribeDefaults.DefaultChunkSeconds);
+            for (int offset = 0; offset < totalSamples; offset += chunkSamples)
+            {
+                var count = Math.Min(chunkSamples, totalSamples - offset);
+                var chunk = new float[count];
+                Array.Copy(samples, offset, chunk, 0, count);
+                session.ProcessAudioChunk(chunk, TimeSpan.FromSeconds(offset / (double)sampleRate));
+
+                if (progress != null)
+                {
+                    var raw = (int)Math.Clamp(((offset + count) * 100.0) / totalSamples, 0, 100);
+                    progress.Report(MapProgress(raw, progressStart, progressEnd));
+                }
+            }
+            session.Complete();
+
+            log?.Invoke("Diarization complete.");
+            progress?.Report(progressEnd);
+
+            return session.Timeline;
+        }
+
         private static long GetWavDurationMilliseconds(string wavPath)
         {
             // Basic WAV header parse: ByteRate at offset 28 (4 bytes, LE), Data chunk size at offset 40 (4 bytes, LE)
             // This assumes standard PCM with fixed header layout.
+            try
+            {
+                using var reader = new NAudio.Wave.WaveFileReader(wavPath);
+                var totalMs = reader.TotalTime.TotalMilliseconds;
+                if (totalMs > 0)
+                {
+                    return (long)totalMs;
+                }
+            }
+            catch
+            {
+                // Fall back to manual header parsing.
+            }
+
             try
             {
                 using var fs = File.OpenRead(wavPath);
@@ -129,6 +216,17 @@ namespace Transcribe
             {
                 return 0;
             }
+        }
+
+        private static int MapProgress(int percent, int start, int end)
+        {
+            var clamped = Math.Clamp(percent, 0, 100);
+            if (end <= start)
+            {
+                return start;
+            }
+
+            return start + (int)Math.Round((end - start) * (clamped / 100.0));
         }
 
         private static async Task DownloadModel(string modelPath, GgmlType ggmlType, Action<string>? log)

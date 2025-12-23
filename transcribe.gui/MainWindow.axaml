@@ -65,6 +65,68 @@
 
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
 
+                <StackPanel Spacing="{DynamicResource RowGap}">
+                  <DockPanel LastChildFill="True">
+                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                  </DockPanel>
+
+                  <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Model (ONNX)" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DiarizationModelPath}" Watermark="{Binding DefaultDiarizationModelPath}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Model URL" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DiarizationModelUrl}" Watermark="Optional download URL" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Config (JSON)" />
+                      <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DiarizationConfigPath}" Watermark="{Binding DefaultDiarizationConfigPath}" />
+                    </Grid>
+                    <TextBlock Classes="muted" Text="Leave fields empty to use the bundled defaults. URL downloads only if the model is missing." TextWrapping="Wrap" />
+                    <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                    <TextBlock Text="Diarization tuning" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationSimilarityThreshold}" />
+                      <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Fallback similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="3" Minimum="0.3" Maximum="0.9" Increment="0.01" Width="120" Value="{Binding DiarizationFallbackSimilarityThreshold}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Active match margin" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationActiveMatchMargin}" />
+                      <TextBlock Grid.Row="1" Grid.Column="2" Classes="formLabel" Text="Instant switch" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="3" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationInstantSwitchSimilarity}" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Energy threshold" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="1" Minimum="0.001" Maximum="0.05" Increment="0.001" Width="120" Value="{Binding DiarizationEnergyThreshold}" />
+                      <TextBlock Grid.Row="2" Grid.Column="2" Classes="formLabel" Text="Max segment (s)" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="3" Minimum="2" Maximum="60" Increment="1" Width="120" Value="{Binding DiarizationMaxSegmentSeconds}" />
+
+                      <TextBlock Grid.Row="3" Grid.Column="0" Classes="formLabel" Text="Min speech (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSpeechMs}" />
+                      <TextBlock Grid.Row="3" Grid.Column="2" Classes="formLabel" Text="Min silence (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="3" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSilenceMs}" />
+
+                      <TextBlock Grid.Row="4" Grid.Column="0" Classes="formLabel" Text="Window (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="1" Minimum="0.5" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowSeconds}" />
+                      <TextBlock Grid.Row="4" Grid.Column="2" Classes="formLabel" Text="Window hop (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="3" Minimum="0.1" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowHopSeconds}" />
+
+                      <TextBlock Grid.Row="5" Grid.Column="0" Classes="formLabel" Text="Min speaker windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinSpeakerWindows}" />
+                      <TextBlock Grid.Row="5" Grid.Column="2" Classes="formLabel" Text="Min new windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="3" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinNewSpeakerWindows}" />
+
+                      <TextBlock Grid.Row="6" Grid.Column="0" Classes="formLabel" Text="Overlap min sim" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMinSimilarity}" />
+                      <TextBlock Grid.Row="6" Grid.Column="2" Classes="formLabel" Text="Overlap max gap" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="3" Minimum="0.0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMaxGap}" />
+                    </Grid>
+                    <ToggleSwitch Content="Log diarization scores (debug)" IsChecked="{Binding DiarizationLogScores}" />
+                    <TextBlock Classes="muted" Text="Logs per-window similarity scores to the system log." TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+
                 <!-- Ollama Section -->
                 <DockPanel LastChildFill="True">
                   <ToggleSwitch DockPanel.Dock="Left" Content="Summarize with Ollama" IsChecked="{Binding SummarizeWithOllama}" />
@@ -143,6 +205,68 @@
                      <TextBlock Text="seconds" VerticalAlignment="Center" Classes="muted" />
                   </StackPanel>
                 </Grid>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+
+                <StackPanel Spacing="{DynamicResource RowGap}">
+                  <DockPanel LastChildFill="True">
+                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                  </DockPanel>
+
+                  <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Model (ONNX)" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DiarizationModelPath}" Watermark="{Binding DefaultDiarizationModelPath}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Model URL" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DiarizationModelUrl}" Watermark="Optional download URL" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Config (JSON)" />
+                      <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DiarizationConfigPath}" Watermark="{Binding DefaultDiarizationConfigPath}" />
+                    </Grid>
+                    <TextBlock Classes="muted" Text="Leave fields empty to use the bundled defaults. URL downloads only if the model is missing." TextWrapping="Wrap" />
+                    <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                    <TextBlock Text="Diarization tuning" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationSimilarityThreshold}" />
+                      <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Fallback similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="3" Minimum="0.3" Maximum="0.9" Increment="0.01" Width="120" Value="{Binding DiarizationFallbackSimilarityThreshold}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Active match margin" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationActiveMatchMargin}" />
+                      <TextBlock Grid.Row="1" Grid.Column="2" Classes="formLabel" Text="Instant switch" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="3" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationInstantSwitchSimilarity}" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Energy threshold" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="1" Minimum="0.001" Maximum="0.05" Increment="0.001" Width="120" Value="{Binding DiarizationEnergyThreshold}" />
+                      <TextBlock Grid.Row="2" Grid.Column="2" Classes="formLabel" Text="Max segment (s)" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="3" Minimum="2" Maximum="60" Increment="1" Width="120" Value="{Binding DiarizationMaxSegmentSeconds}" />
+
+                      <TextBlock Grid.Row="3" Grid.Column="0" Classes="formLabel" Text="Min speech (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSpeechMs}" />
+                      <TextBlock Grid.Row="3" Grid.Column="2" Classes="formLabel" Text="Min silence (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="3" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSilenceMs}" />
+
+                      <TextBlock Grid.Row="4" Grid.Column="0" Classes="formLabel" Text="Window (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="1" Minimum="0.5" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowSeconds}" />
+                      <TextBlock Grid.Row="4" Grid.Column="2" Classes="formLabel" Text="Window hop (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="3" Minimum="0.1" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowHopSeconds}" />
+
+                      <TextBlock Grid.Row="5" Grid.Column="0" Classes="formLabel" Text="Min speaker windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinSpeakerWindows}" />
+                      <TextBlock Grid.Row="5" Grid.Column="2" Classes="formLabel" Text="Min new windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="3" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinNewSpeakerWindows}" />
+
+                      <TextBlock Grid.Row="6" Grid.Column="0" Classes="formLabel" Text="Overlap min sim" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMinSimilarity}" />
+                      <TextBlock Grid.Row="6" Grid.Column="2" Classes="formLabel" Text="Overlap max gap" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="3" Minimum="0.0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMaxGap}" />
+                    </Grid>
+                    <ToggleSwitch Content="Log diarization scores (debug)" IsChecked="{Binding DiarizationLogScores}" />
+                    <TextBlock Classes="muted" Text="Logs per-window similarity scores to the system log." TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
 
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
 
@@ -228,6 +352,68 @@
                      <TextBlock Text="seconds" VerticalAlignment="Center" Classes="muted" />
                   </StackPanel>
                 </Grid>
+
+                <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
+
+                <StackPanel Spacing="{DynamicResource RowGap}">
+                  <DockPanel LastChildFill="True">
+                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                  </DockPanel>
+
+                  <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Model (ONNX)" />
+                      <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DiarizationModelPath}" Watermark="{Binding DefaultDiarizationModelPath}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Model URL" />
+                      <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DiarizationModelUrl}" Watermark="Optional download URL" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Config (JSON)" />
+                      <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DiarizationConfigPath}" Watermark="{Binding DefaultDiarizationConfigPath}" />
+                    </Grid>
+                    <TextBlock Classes="muted" Text="Leave fields empty to use the bundled defaults. URL downloads only if the model is missing." TextWrapping="Wrap" />
+                    <Separator Margin="0,4" Background="#33FFFFFF" Height="1" />
+                    <TextBlock Text="Diarization tuning" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
+                      <TextBlock Grid.Row="0" Grid.Column="0" Classes="formLabel" Text="Similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationSimilarityThreshold}" />
+                      <TextBlock Grid.Row="0" Grid.Column="2" Classes="formLabel" Text="Fallback similarity" />
+                      <NumericUpDown Grid.Row="0" Grid.Column="3" Minimum="0.3" Maximum="0.9" Increment="0.01" Width="120" Value="{Binding DiarizationFallbackSimilarityThreshold}" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Classes="formLabel" Text="Active match margin" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationActiveMatchMargin}" />
+                      <TextBlock Grid.Row="1" Grid.Column="2" Classes="formLabel" Text="Instant switch" />
+                      <NumericUpDown Grid.Row="1" Grid.Column="3" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationInstantSwitchSimilarity}" />
+
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="formLabel" Text="Energy threshold" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="1" Minimum="0.001" Maximum="0.05" Increment="0.001" Width="120" Value="{Binding DiarizationEnergyThreshold}" />
+                      <TextBlock Grid.Row="2" Grid.Column="2" Classes="formLabel" Text="Max segment (s)" />
+                      <NumericUpDown Grid.Row="2" Grid.Column="3" Minimum="2" Maximum="60" Increment="1" Width="120" Value="{Binding DiarizationMaxSegmentSeconds}" />
+
+                      <TextBlock Grid.Row="3" Grid.Column="0" Classes="formLabel" Text="Min speech (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="1" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSpeechMs}" />
+                      <TextBlock Grid.Row="3" Grid.Column="2" Classes="formLabel" Text="Min silence (ms)" />
+                      <NumericUpDown Grid.Row="3" Grid.Column="3" Minimum="100" Maximum="5000" Increment="50" Width="120" Value="{Binding DiarizationMinSilenceMs}" />
+
+                      <TextBlock Grid.Row="4" Grid.Column="0" Classes="formLabel" Text="Window (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="1" Minimum="0.5" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowSeconds}" />
+                      <TextBlock Grid.Row="4" Grid.Column="2" Classes="formLabel" Text="Window hop (s)" />
+                      <NumericUpDown Grid.Row="4" Grid.Column="3" Minimum="0.1" Maximum="5.0" Increment="0.1" Width="120" Value="{Binding DiarizationWindowHopSeconds}" />
+
+                      <TextBlock Grid.Row="5" Grid.Column="0" Classes="formLabel" Text="Min speaker windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="1" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinSpeakerWindows}" />
+                      <TextBlock Grid.Row="5" Grid.Column="2" Classes="formLabel" Text="Min new windows" />
+                      <NumericUpDown Grid.Row="5" Grid.Column="3" Minimum="1" Maximum="20" Increment="1" Width="120" Value="{Binding DiarizationMinNewSpeakerWindows}" />
+
+                      <TextBlock Grid.Row="6" Grid.Column="0" Classes="formLabel" Text="Overlap min sim" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="1" Minimum="0.3" Maximum="0.95" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMinSimilarity}" />
+                      <TextBlock Grid.Row="6" Grid.Column="2" Classes="formLabel" Text="Overlap max gap" />
+                      <NumericUpDown Grid.Row="6" Grid.Column="3" Minimum="0.0" Maximum="0.3" Increment="0.01" Width="120" Value="{Binding DiarizationOverlapMaxGap}" />
+                    </Grid>
+                    <ToggleSwitch Content="Log diarization scores (debug)" IsChecked="{Binding DiarizationLogScores}" />
+                    <TextBlock Classes="muted" Text="Logs per-window similarity scores to the system log." TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
 
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
                 

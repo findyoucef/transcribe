@@ -86,6 +86,21 @@ Supported values (downloaded on first use into the app’s binary directory):
 ### Languages
 - Default is `en`. Pass ISO codes (e.g., `en`, `fr`, `es`) or `auto` for language detection.
 
+### Speaker diarization (offline)
+Enable diarization to add speaker labels (e.g., `[S1]`, `[SPK:S2]`) to the transcript output.
+- Requires a speaker-embedding ONNX model (default expected at `models/wespeaker_en_voxceleb_resnet293_LM.onnx` next to the binary).
+- Use `--diarize` to enable it for `file`, `mic`, or `speaker` commands.
+- Optional: `--diarization-model <path>` overrides the local model path.
+- Optional: `--diarization-model-url <url>` downloads the model if it is missing.
+- Optional: `--diarization-config <path>` uses a custom config JSON (default `models/ecapa-tdnn.json`).
+
+Examples:
+```bash
+./transcribe file sample.wav --diarize --diarization-model .\models\wespeaker_en_voxceleb_resnet293_LM.onnx
+./transcribe mic --diarize --diarization-model-url https://example.com/wespeaker_en_voxceleb_resnet293_LM.onnx
+./transcribe speaker --diarize --mic-device 1
+```
+
 ## Notes
 - Network is required only for the initial model download (and Ollama summaries if enabled).
 - Standard PCM WAV input works best; malformed headers will skip progress reporting.

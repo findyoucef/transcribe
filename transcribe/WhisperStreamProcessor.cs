@@ -22,6 +22,7 @@ namespace Transcribe
         private readonly Action<string>? onText;
         private readonly Action<string>? onStatus;
         private readonly bool emitConsoleOutput;
+        private readonly DiarizationPipeline? diarization;
 
         public WhisperStreamProcessor(
             string modelPath,
@@ -34,7 +35,8 @@ namespace Transcribe
             TranscriptionMerger? merger = null,
             Action<string>? onText = null,
             Action<string>? onStatus = null,
-            bool emitConsoleOutput = true)
+            bool emitConsoleOutput = true,
+            DiarizationPipeline? diarization = null)
         {
             this.recorder = recorder;
             whisperFactory = WhisperFactory.FromPath(modelPath);
@@ -49,6 +51,7 @@ namespace Transcribe
             this.onText = onText;
             this.onStatus = onStatus;
             this.emitConsoleOutput = emitConsoleOutput;
+            this.diarization = diarization;
             
             cancellationTokenSource = new CancellationTokenSource();
             audioBuffer = new List<byte>();
@@ -195,6 +198,14 @@ namespace Transcribe
             try
             {
                 using var wavStream = recorder.CreateWavStream(audioData);
+
+                if (diarization != null)
+                {
+                    var wavBytes = wavStream.ToArray();
+                    var samples = AudioUtils.ReadWavBytesAsMono(wavBytes, diarization.Session.SampleRate);
+                    diarization.Session.ProcessAudioChunk(samples, chunkBaseOffset);
+                    wavStream.Position = 0;
+                }
                 
                 var transcriptionLines = new List<string>();
                 var consoleText = new List<string>();
@@ -206,19 +217,18 @@ namespace Transcribe
                     {
                         var adjStart = chunkBaseOffset + result.Start;
                         var adjEnd = chunkBaseOffset + result.End;
-                        transcriptionLines.Add($"{adjStart}->{adjEnd}: {result.Text.Trim()}");
-                        consoleText.Add(result.Text.Trim());
-                        items.Add(new TranscriptionItem(adjStart, adjEnd, result.Text.Trim(), sourceLabel ?? ""));
+                        var trimmed = result.Text.Trim();
+                        var speakerLabel = diarization?.Session.GetSpeakerLabel(adjStart, adjEnd);
+                        var taggedText = TranscriptionTagger.ApplyTags(trimmed, sourceLabel, speakerLabel);
+                        transcriptionLines.Add($"{adjStart}->{adjEnd}: {taggedText}");
+                        consoleText.Add(taggedText);
+                        items.Add(new TranscriptionItem(adjStart, adjEnd, taggedText, sourceLabel ?? ""));
                     }
                 }
                 
                 if (consoleText.Count > 0)
                 {
-                    var consoleOutput = string.Join(" ", consoleText);
-
-                    var output = sourceLabel != null
-                        ? $"[{sourceLabel}] {consoleOutput}"
-                        : consoleOutput;
+                    var output = string.Join(" ", consoleText);
 
                     onText?.Invoke(output);
                     if (emitConsoleOutput)
@@ -267,6 +277,8 @@ namespace Transcribe
             {
                 await visualizationTask;
             }
+
+            diarization?.Session.Complete();
         }
 
         public void Dispose()
@@ -276,6 +288,8 @@ namespace Transcribe
             visualizationTask?.Wait();
             
             transcriptWriter?.Dispose();
+
+            diarization?.Dispose();
             
             processor?.Dispose();
             whisperFactory?.Dispose();
