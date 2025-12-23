@@ -179,13 +179,35 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref enableDiarization, value))
             {
+                if (!enableDiarization && DiarizationAdvanced)
+                {
+                    DiarizationAdvanced = false;
+                }
                 RaisePropertyChanged(nameof(ShowDiarizationSettings));
                 RaiseCanStartChanged();
             }
         }
     }
 
-    public bool ShowDiarizationSettings => EnableDiarization;
+    private bool diarizationAdvanced;
+    public bool DiarizationAdvanced
+    {
+        get => diarizationAdvanced;
+        set
+        {
+            if (SetProperty(ref diarizationAdvanced, value))
+            {
+                if (diarizationAdvanced && !EnableDiarization)
+                {
+                    EnableDiarization = true;
+                }
+                RaisePropertyChanged(nameof(ShowDiarizationSettings));
+                RaiseCanStartChanged();
+            }
+        }
+    }
+
+    public bool ShowDiarizationSettings => EnableDiarization && DiarizationAdvanced;
 
     private string diarizationModelPath = "";
     public string DiarizationModelPath
@@ -717,6 +739,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedLanguage = TranscribeDefaults.DefaultLanguage;
         SelectedModel = TranscribeDefaults.DefaultModel;
         EnableDiarization = false;
+        DiarizationAdvanced = false;
         DiarizationModelPath = "";
         DiarizationModelUrl = "";
         DiarizationConfigPath = "";

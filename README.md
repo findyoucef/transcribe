@@ -92,7 +92,7 @@ Enable diarization to add speaker labels (e.g., `[S1]`, `[SPK:S2]`) to the trans
 - Use `--diarize` to enable it for `file`, `mic`, or `speaker` commands.
 - Optional: `--diarization-model <path>` overrides the local model path.
 - Optional: `--diarization-model-url <url>` downloads the model if it is missing.
-- Optional: `--diarization-config <path>` uses a custom config JSON (default `models/ecapa-tdnn.json`).
+- Optional: `--diarization-config <path>` uses a custom config JSON (default `models/wespeaker_en_voxceleb_resnet293_LM.json`).
 
 Examples:
 ```bash

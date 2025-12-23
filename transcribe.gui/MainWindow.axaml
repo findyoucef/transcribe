@@ -67,7 +67,11 @@
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
                   <DockPanel LastChildFill="True">
-                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
+                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                    </StackPanel>
                   </DockPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
@@ -210,7 +214,11 @@
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
                   <DockPanel LastChildFill="True">
-                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
+                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                    </StackPanel>
                   </DockPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
@@ -357,7 +365,11 @@
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
                   <DockPanel LastChildFill="True">
-                    <ToggleSwitch DockPanel.Dock="Left" Content="Enable speaker diarization" IsChecked="{Binding EnableDiarization}" />
+                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
+                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                    </StackPanel>
                   </DockPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">

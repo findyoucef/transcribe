@@ -29,6 +29,7 @@ namespace Transcribe
         private readonly int minNewSpeakerWindows;
         private readonly float instantSwitchSimilarity;
         private readonly int minReturnSpeakerWindows;
+        private readonly TimeSpan minReturnHoldDuration;
         private readonly float strongMatchThreshold;
         private readonly bool logScores;
 
@@ -85,6 +86,7 @@ namespace Transcribe
             minNewSpeakerWindows = Math.Max(minSpeakerWindows, options.MinNewSpeakerWindows);
             instantSwitchSimilarity = Math.Clamp(options.InstantSwitchSimilarity, similarityThreshold, 0.95f);
             minReturnSpeakerWindows = Math.Max(1, minSpeakerWindows / 2);
+            minReturnHoldDuration = TimeSpan.FromSeconds((windowSamples * 2) / (double)sampleRate);
             strongMatchThreshold = Math.Min(0.9f, similarityThreshold + 0.05f);
             logScores = options.LogScores;
         }
@@ -348,8 +350,16 @@ namespace Transcribe
                 && canReturn
                 && !strongMatch
                 && best.Score >= fallbackSimilarityThreshold
+                && bestGap >= activeMatchMargin
                 && !string.IsNullOrWhiteSpace(lastSpeaker)
                 && string.Equals(best.Label, lastSpeaker, StringComparison.Ordinal);
+            var weakExistingMatch = hasBest
+                && canReturn
+                && !strongMatch
+                && !returnMatch
+                && best.Score >= fallbackSimilarityThreshold
+                && bestGap >= activeMatchMargin
+                && (activeSpeaker == null || !string.Equals(best.Label, activeSpeaker, StringComparison.Ordinal));
 
             if (strongMatch || returnMatch)
             {
@@ -380,7 +390,11 @@ namespace Transcribe
                 {
                     AdvanceCandidateExisting(best.Label, windowStart);
                     var requiredWindows = GetRequiredExistingWindows(best.Label);
-                    if (candidateWindows >= requiredWindows)
+                    var allowFastReturn = returnMatch
+                        && activeSpeaker != null
+                        && (windowStart - activeSpeakerStart) >= minReturnHoldDuration;
+                    if (candidateWindows >= requiredWindows
+                        || (allowFastReturn && candidateWindows >= 1))
                     {
                         SwitchToExistingSpeaker(best.Index, best.Label, embedding, windowStart, windowEnd);
                         ResetCandidate();
@@ -389,6 +403,24 @@ namespace Transcribe
                     {
                         ExtendOrStartSpeakerSegment(activeSpeaker!, windowStart, windowEnd);
                     }
+                }
+                return;
+            }
+
+            if (weakExistingMatch)
+            {
+                AdvanceCandidateExisting(best.Label, windowStart);
+                var allowFastReturn = activeSpeaker != null
+                    && (windowStart - activeSpeakerStart) >= minReturnHoldDuration;
+                if (candidateWindows >= minReturnSpeakerWindows
+                    || (allowFastReturn && candidateWindows >= 1))
+                {
+                    SwitchToExistingSpeaker(best.Index, best.Label, embedding, candidateStart, windowEnd);
+                    ResetCandidate();
+                }
+                else if (activeSpeaker != null)
+                {
+                    ExtendOrStartSpeakerSegment(activeSpeaker!, windowStart, windowEnd);
                 }
                 return;
             }
