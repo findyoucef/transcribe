@@ -1319,12 +1319,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private async Task StopAsync()
-    {
-        if (!IsRunning)
+        private async Task StopAsync()
         {
-            return;
-        }
+            if (!IsRunning)
+            {
+                return;
+            }
 
         // Nothing to stop in file mode; it completes synchronously.
         if (SelectedModeIndex == 0)
@@ -1364,17 +1364,18 @@ public sealed class MainViewModel : ObservableObject
         }
         finally
         {
+            merger?.Dispose();
+            merger = null;
+
             micProcessor?.Dispose();
             speakerProcessor?.Dispose();
             micRecorder?.Dispose();
             speakerRecorder?.Dispose();
-            merger?.Dispose();
 
             micProcessor = null;
             speakerProcessor = null;
             micRecorder = null;
             speakerRecorder = null;
-            merger = null;
 
             timer.Stop();
             startedAt = null;

@@ -372,3 +372,4 @@ gha-creds-*.json
 .github/workflows/gemini-review.yml
 .github/workflows/gemini-scheduled-triage.yml
 .github/workflows/gemini-triage.yml
+transcribe/models/wespeaker_en_voxceleb_resnet293_LM.onnx

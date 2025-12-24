@@ -66,13 +66,11 @@
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
-                  <DockPanel LastChildFill="True">
-                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
-                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
-                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
-                    </StackPanel>
-                  </DockPanel>
+                  <TextBlock Classes="formLabel" Width="NaN" Text="Speaker diarization" />
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpaceM}" HorizontalAlignment="Left">
+                    <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                    <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                  </StackPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
@@ -213,13 +211,11 @@
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
-                  <DockPanel LastChildFill="True">
-                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
-                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
-                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
-                    </StackPanel>
-                  </DockPanel>
+                  <TextBlock Classes="formLabel" Width="NaN" Text="Speaker diarization" />
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpaceM}" HorizontalAlignment="Left">
+                    <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                    <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                  </StackPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
@@ -364,13 +360,11 @@
                 <Separator Margin="0,8" Background="#33FFFFFF" Height="1" />
 
                 <StackPanel Spacing="{DynamicResource RowGap}">
-                  <DockPanel LastChildFill="True">
-                    <TextBlock DockPanel.Dock="Left" Classes="formLabel" Text="Speaker diarization" VerticalAlignment="Center" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="{DynamicResource SpaceM}">
-                      <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
-                      <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
-                    </StackPanel>
-                  </DockPanel>
+                  <TextBlock Classes="formLabel" Width="NaN" Text="Speaker diarization" />
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpaceM}" HorizontalAlignment="Left">
+                    <ToggleSwitch Content="On" IsChecked="{Binding EnableDiarization}" />
+                    <ToggleSwitch Content="Advanced" IsChecked="{Binding DiarizationAdvanced}" />
+                  </StackPanel>
 
                   <StackPanel IsVisible="{Binding ShowDiarizationSettings}" Spacing="{DynamicResource RowGap}">
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">

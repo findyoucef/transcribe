@@ -89,10 +89,10 @@ namespace Transcribe
 
             const int diarizationProgressSpan = 15;
             var transcriptionProgressStart = 0;
-            DiarizationTimeline? timeline = null;
+            DiarizationResult? diarization = null;
             if (diarizationOptions?.Enabled == true)
             {
-                timeline = await BuildDiarizationTimelineAsync(
+                diarization = await BuildDiarizationResultAsync(
                     wavFileName,
                     diarizationOptions,
                     log,
@@ -105,7 +105,7 @@ namespace Transcribe
             await foreach (var result in processor.ProcessAsync(fileStream))
             {
                 var trimmed = result.Text.Trim();
-                var speakerLabel = timeline?.GetSpeakerLabel(result.Start, result.End);
+                var speakerLabel = diarization?.GetStableSpeakerLabel(result.Start, result.End);
                 var taggedText = TranscriptionTagger.ApplyTags(trimmed, null, speakerLabel);
                 var line = $"{result.Start}->{result.End}: {taggedText}";
                 await outputFile.WriteLineAsync(line);
@@ -135,7 +135,7 @@ namespace Transcribe
             }
         }
 
-        private static async Task<DiarizationTimeline?> BuildDiarizationTimelineAsync(
+        private static async Task<DiarizationResult?> BuildDiarizationResultAsync(
             string wavFileName,
             DiarizationOptions options,
             Action<string>? log,
@@ -156,7 +156,7 @@ namespace Transcribe
             {
                 log?.Invoke("Diarization skipped: no audio samples.");
                 progress?.Report(progressEnd);
-                return session.Timeline;
+                return new DiarizationResult(session.Timeline, session.MergeableSegmentDuration);
             }
 
             var sampleRate = resources.Config.SampleRate;
@@ -180,7 +180,7 @@ namespace Transcribe
             log?.Invoke("Diarization complete.");
             progress?.Report(progressEnd);
 
-            return session.Timeline;
+            return new DiarizationResult(session.Timeline, session.MergeableSegmentDuration);
         }
 
         private static long GetWavDurationMilliseconds(string wavPath)
@@ -244,6 +244,65 @@ namespace Transcribe
             using var modelStream = await WhisperGgmlDownloader.Default.GetGgmlModelAsync(ggmlType);
             using var fileWriter = File.Open(modelPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             await modelStream.CopyToAsync(fileWriter);
+        }
+
+        private sealed class DiarizationResult
+        {
+            public DiarizationResult(DiarizationTimeline timeline, TimeSpan mergeThreshold)
+            {
+                Timeline = timeline;
+                MergeThreshold = mergeThreshold;
+            }
+
+            public DiarizationTimeline Timeline { get; }
+            public TimeSpan MergeThreshold { get; }
+
+            public string? GetStableSpeakerLabel(TimeSpan start, TimeSpan end)
+            {
+                var label = Timeline.GetSpeakerLabel(start, end);
+                if (label == null)
+                {
+                    return null;
+                }
+
+                if (MergeThreshold <= TimeSpan.Zero)
+                {
+                    return label;
+                }
+
+                var segments = Timeline.Snapshot();
+                if (segments.Count < 3)
+                {
+                    return label;
+                }
+
+                var ordered = new List<DiarizationSegment>(segments);
+                ordered.Sort(static (a, b) => a.Start.CompareTo(b.Start));
+                var midTicks = start.Ticks + ((end - start).Ticks / 2);
+                var mid = new TimeSpan(midTicks);
+
+                for (int i = 0; i < ordered.Count; i++)
+                {
+                    var seg = ordered[i];
+                    if (seg.Start <= mid && seg.End >= mid)
+                    {
+                        if ((seg.End - seg.Start) <= MergeThreshold
+                            && i > 0
+                            && i < ordered.Count - 1)
+                        {
+                            var prev = ordered[i - 1];
+                            var next = ordered[i + 1];
+                            if (string.Equals(prev.Speaker, next.Speaker, StringComparison.Ordinal))
+                            {
+                                return prev.Speaker;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                return label;
+            }
         }
     }
 }

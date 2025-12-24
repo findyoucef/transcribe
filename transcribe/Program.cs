@@ -15,6 +15,10 @@ namespace Transcribe
             var fileCommand = CreateFileCommand();
             rootCommand.AddCommand(fileCommand);
 
+            // Stream file through live pipeline (for testing)
+            var streamFileCommand = CreateStreamFileCommand();
+            rootCommand.AddCommand(streamFileCommand);
+
             // Microphone transcription command
             var micCommand = CreateMicCommand();
             rootCommand.AddCommand(micCommand);
@@ -159,6 +163,159 @@ namespace Transcribe
             return fileCommand;
         }
 
+        private static Command CreateStreamFileCommand()
+        {
+            var wavArgument = new Argument<string>(
+                name: "wav",
+                description: "Path to the WAV file to stream through the live pipeline")
+            {
+                Arity = ArgumentArity.ExactlyOne
+            };
+
+            var modelOption = new Option<string>(
+                name: "--model",
+                description: $"Whisper model to use: {string.Join(", ", TranscribeDefaults.SupportedModels)} (default: {TranscribeDefaults.DefaultModel})",
+                getDefaultValue: () => TranscribeDefaults.DefaultModel);
+
+            var languageOption = new Option<string>(
+                name: "--language",
+                description: $"Language code for transcription (e.g., en, fr, es) or auto. Default: {TranscribeDefaults.DefaultLanguage}",
+                getDefaultValue: () => TranscribeDefaults.DefaultLanguage);
+
+            var chunkSizeOption = new Option<int>(
+                name: "--chunk-size",
+                description: $"Audio chunk size in seconds for processing. Default: {TranscribeDefaults.DefaultChunkSeconds}",
+                getDefaultValue: () => TranscribeDefaults.DefaultChunkSeconds);
+
+            var outputDirOption = new Option<string?>(
+                name: "--output-dir",
+                description: "Directory to write the transcript file. Default: current working directory.",
+                getDefaultValue: () => null);
+
+            var streamCommand = new Command("stream-file", "Stream a WAV file through the live transcription pipeline")
+            {
+                wavArgument,
+                modelOption,
+                languageOption,
+                chunkSizeOption,
+                outputDirOption
+            };
+
+            var diarizationOptions = AddDiarizationOptions(streamCommand);
+
+            streamCommand.SetHandler(async (InvocationContext context) =>
+            {
+                var wavPath = context.ParseResult.GetValueForArgument(wavArgument);
+                var model = context.ParseResult.GetValueForOption(modelOption) ?? TranscribeDefaults.DefaultModel;
+                var language = context.ParseResult.GetValueForOption(languageOption) ?? TranscribeDefaults.DefaultLanguage;
+                var chunkSize = context.ParseResult.GetValueForOption(chunkSizeOption);
+                var outputDir = context.ParseResult.GetValueForOption(outputDirOption);
+                var diarize = context.ParseResult.GetValueForOption(diarizationOptions.Enable);
+                var diarizationModel = context.ParseResult.GetValueForOption(diarizationOptions.ModelPath);
+                var diarizationModelUrl = context.ParseResult.GetValueForOption(diarizationOptions.ModelUrl);
+                var diarizationConfig = context.ParseResult.GetValueForOption(diarizationOptions.ConfigPath);
+                var similarityThreshold = context.ParseResult.GetValueForOption(diarizationOptions.SimilarityThreshold);
+                var energyThreshold = context.ParseResult.GetValueForOption(diarizationOptions.EnergyThreshold);
+                var minSpeechMs = context.ParseResult.GetValueForOption(diarizationOptions.MinSpeechMs);
+                var minSilenceMs = context.ParseResult.GetValueForOption(diarizationOptions.MinSilenceMs);
+                var maxSegmentSeconds = context.ParseResult.GetValueForOption(diarizationOptions.MaxSegmentSeconds);
+                var windowSeconds = context.ParseResult.GetValueForOption(diarizationOptions.WindowSeconds);
+                var windowHopSeconds = context.ParseResult.GetValueForOption(diarizationOptions.WindowHopSeconds);
+                var minSpeakerWindows = context.ParseResult.GetValueForOption(diarizationOptions.MinSpeakerWindows);
+                var activeMatchMargin = context.ParseResult.GetValueForOption(diarizationOptions.ActiveMatchMargin);
+                var fallbackSimilarity = context.ParseResult.GetValueForOption(diarizationOptions.FallbackSimilarityThreshold);
+                var minNewSpeakerWindows = context.ParseResult.GetValueForOption(diarizationOptions.MinNewSpeakerWindows);
+                var instantSwitchSimilarity = context.ParseResult.GetValueForOption(diarizationOptions.InstantSwitchSimilarity);
+                var logScores = context.ParseResult.GetValueForOption(diarizationOptions.LogScores);
+                var overlapMinSimilarity = context.ParseResult.GetValueForOption(diarizationOptions.OverlapMinSimilarity);
+                var overlapMaxGap = context.ParseResult.GetValueForOption(diarizationOptions.OverlapMaxGap);
+
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(wavPath) || !File.Exists(wavPath))
+                    {
+                        Console.Error.WriteLine("A valid WAV file path is required.");
+                        return;
+                    }
+
+                    var diarizationSettings = BuildDiarizationOptions(
+                        diarize,
+                        diarizationModel,
+                        diarizationModelUrl,
+                        diarizationConfig,
+                        similarityThreshold,
+                        energyThreshold,
+                        minSpeechMs,
+                        minSilenceMs,
+                        maxSegmentSeconds,
+                        windowSeconds,
+                        windowHopSeconds,
+                        minSpeakerWindows,
+                        activeMatchMargin,
+                        fallbackSimilarity,
+                        minNewSpeakerWindows,
+                        instantSwitchSimilarity,
+                        logScores,
+                        overlapMinSimilarity,
+                        overlapMaxGap);
+                    DiarizationResources? diarizationResources = null;
+                    if (diarizationSettings.Enabled)
+                    {
+                        diarizationResources = await DiarizationModelLoader.EnsureResourcesAsync(diarizationSettings, Console.WriteLine);
+                    }
+
+                    var modelPath = await WhisperClient.EnsureModelDownloaded(model);
+                    var transcriptPath = ResolveTranscriptPath($"{Path.GetFileNameWithoutExtension(wavPath)}.stream.txt", outputDir);
+
+                    Console.WriteLine($"Streaming file: {wavPath}");
+                    Console.WriteLine($"  Model: {model}");
+                    Console.WriteLine($"  Language: {language}");
+                    Console.WriteLine($"  Chunk size: {chunkSize} sec");
+                    Console.WriteLine($"  Transcript: {transcriptPath}");
+                    Console.WriteLine();
+
+                    DiarizationPipeline? diarization = null;
+                    using var recorder = new FileAudioRecorder(wavPath);
+                    try
+                    {
+                        if (diarizationResources != null)
+                        {
+                            var modelInstance = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
+                            diarization = new DiarizationPipeline(modelInstance, diarizationSettings, Console.WriteLine);
+                        }
+
+                        using var processor = new WhisperStreamProcessor(
+                            modelPath,
+                            language,
+                            recorder,
+                            chunkSize,
+                            sourceLabel: "SPK",
+                            showLevels: false,
+                            transcriptFilePath: transcriptPath,
+                            diarization: diarization);
+
+                        recorder.StartRecording();
+                        processor.StartProcessing();
+                        await processor.WaitForCompletionAsync();
+
+                        recorder.StopRecording();
+                    }
+                    finally
+                    {
+                        diarization?.Dispose();
+                    }
+
+                    Console.WriteLine("Streaming complete.");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error: {ex.Message}");
+                }
+            });
+
+            return streamCommand;
+        }
+
         private static Command CreateMicCommand()
         {
             var modelOption = new Option<string>(
@@ -253,7 +410,6 @@ namespace Transcribe
                         logScores,
                         overlapMinSimilarity,
                         overlapMaxGap);
-
                     DiarizationResources? diarizationResources = null;
                     if (diarizationOptions.Enabled)
                     {
@@ -451,7 +607,6 @@ namespace Transcribe
                         logScores,
                         overlapMinSimilarity,
                         overlapMaxGap);
-
                     DiarizationResources? diarizationResources = null;
                     if (diarizationOptions.Enabled)
                     {

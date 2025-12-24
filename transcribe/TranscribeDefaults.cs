@@ -7,7 +7,7 @@ namespace Transcribe
     {
         public const string DefaultModel = "TinyEn";
         public const string DefaultLanguage = "en";
-        public const int DefaultChunkSeconds = 3;
+        public const int DefaultChunkSeconds = 7;
         public const string DefaultOllamaUrl = "http://localhost:11434/";
         public const string DefaultOllamaModel = "tx-agent:latest";
         public const string DefaultDiarizationModelFileName = "wespeaker_en_voxceleb_resnet293_LM.onnx";
@@ -26,6 +26,7 @@ namespace Transcribe
         public const float DefaultDiarizationOverlapMaxGap = 0.05f;
         public const int DefaultDiarizationMinNewSpeakerWindows = 3;
         public const float DefaultDiarizationInstantSwitchSimilarity = 0.82f;
+        public const int DefaultLiveDiarizationDelaySeconds = 50;
 
         public static readonly IReadOnlyList<string> SupportedModels = new[]
         {

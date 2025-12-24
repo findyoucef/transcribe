@@ -48,6 +48,7 @@ namespace Transcribe
         private TimeSpan activeOverlapStart;
         private TimeSpan activeOverlapEnd;
         private string? lastSpeaker;
+        private string? lastAssignedSpeaker;
         private string? candidateSpeaker;
         private bool candidateIsNew;
         private int candidateWindows;
@@ -93,6 +94,29 @@ namespace Transcribe
 
         public DiarizationTimeline Timeline => timeline;
         public int SampleRate => sampleRate;
+        public TimeSpan LiveLabelDelay
+        {
+            get
+            {
+                var minWindows = Math.Max(minSpeakerWindows, minNewSpeakerWindows);
+                var totalSamples = windowSamples + (hopWindowSamples * Math.Max(0, minWindows - 1));
+                return TimeSpan.FromSeconds(totalSamples / (double)sampleRate);
+            }
+        }
+
+        public TimeSpan MergeableSegmentDuration
+        {
+            get
+            {
+                var windowCount = Math.Max(1, minSpeakerWindows - 1);
+                var totalSamples = hopWindowSamples * windowCount;
+                if (totalSamples <= 0)
+                {
+                    return TimeSpan.Zero;
+                }
+                return TimeSpan.FromSeconds(totalSamples / (double)sampleRate);
+            }
+        }
 
         public void ProcessAudioChunk(float[] samples, TimeSpan chunkBaseOffset)
         {
@@ -175,10 +199,184 @@ namespace Transcribe
             return timeline.GetSpeakerLabel(start, end);
         }
 
+        public string? GetStableSpeakerLabel(TimeSpan start, TimeSpan end)
+        {
+            var label = timeline.GetSpeakerLabel(start, end);
+            if (label == null)
+            {
+                return null;
+            }
+
+            var mergeThreshold = MergeableSegmentDuration;
+            if (mergeThreshold <= TimeSpan.Zero)
+            {
+                return label;
+            }
+
+            var segments = timeline.Snapshot();
+            if (segments.Count < 3)
+            {
+                return label;
+            }
+
+            var ordered = new List<DiarizationSegment>(segments);
+            ordered.Sort(static (a, b) => a.Start.CompareTo(b.Start));
+            var midTicks = start.Ticks + ((end - start).Ticks / 2);
+            var mid = new TimeSpan(midTicks);
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                var seg = ordered[i];
+                if (seg.Start <= mid && seg.End >= mid)
+                {
+                    if ((seg.End - seg.Start) <= mergeThreshold
+                        && i > 0
+                        && i < ordered.Count - 1)
+                    {
+                        var prev = ordered[i - 1];
+                        var next = ordered[i + 1];
+                        if (string.Equals(prev.Speaker, next.Speaker, StringComparison.Ordinal))
+                        {
+                            return prev.Speaker;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            return label;
+        }
+
+        public string? GetLiveSpeakerLabel(TimeSpan start, TimeSpan end)
+        {
+            if (TryGetActiveOverlapLabel(start, end, out var overlap))
+            {
+                return overlap;
+            }
+
+            if (TryGetActiveSpeakerLabel(start, end, out var active))
+            {
+                return active;
+            }
+
+            return timeline.GetSpeakerLabel(start, end);
+        }
+
+        public string? AssignSegment(
+            float[] samples,
+            int startSample,
+            int endSample,
+            TimeSpan start,
+            TimeSpan end)
+        {
+            if (samples.Length == 0 || endSample <= startSample)
+            {
+                return lastAssignedSpeaker;
+            }
+
+            var padSamples = (int)Math.Round(sampleRate * 0.15);
+            var segmentStart = Math.Max(0, startSample - padSamples);
+            var segmentEnd = Math.Min(samples.Length, endSample + padSamples);
+            if (segmentEnd <= segmentStart)
+            {
+                return lastAssignedSpeaker;
+            }
+
+            var length = segmentEnd - segmentStart;
+            if (length < minSpeechSamples)
+            {
+                return lastAssignedSpeaker;
+            }
+
+            var segment = new float[length];
+            Array.Copy(samples, segmentStart, segment, 0, length);
+            var embedding = model.ComputeEmbedding(segment);
+            if (embedding.Length == 0)
+            {
+                return lastAssignedSpeaker;
+            }
+
+            var best = clusterer.FindBest(embedding);
+            if (best.Index >= 0 && best.Score >= similarityThreshold)
+            {
+                clusterer.UpdateCluster(best.Index, embedding);
+                lastAssignedSpeaker = best.Label;
+                timeline.Add(new DiarizationSegment(start, end, best.Label));
+                return best.Label;
+            }
+
+            if (!string.IsNullOrWhiteSpace(lastAssignedSpeaker)
+                && clusterer.TryGetSimilarity(lastAssignedSpeaker, embedding, out var lastScore, out var lastIndex)
+                && lastScore >= fallbackSimilarityThreshold)
+            {
+                clusterer.UpdateCluster(lastIndex, embedding);
+                timeline.Add(new DiarizationSegment(start, end, lastAssignedSpeaker));
+                return lastAssignedSpeaker;
+            }
+
+            var minNewSamples = windowSamples + (hopWindowSamples * Math.Max(0, minNewSpeakerWindows - 1));
+            var minNewDuration = TimeSpan.FromSeconds(minNewSamples / (double)sampleRate);
+            if ((end - start) < minNewDuration)
+            {
+                return lastAssignedSpeaker;
+            }
+
+            var label = clusterer.CreateCluster(embedding);
+            lastAssignedSpeaker = label;
+            timeline.Add(new DiarizationSegment(start, end, label));
+            return label;
+        }
+
         private bool IsSpeech(float rms)
         {
             var threshold = Math.Max(energyThreshold, noiseFloor * noiseMultiplier);
             return rms >= threshold;
+        }
+
+        private bool TryGetActiveOverlapLabel(TimeSpan start, TimeSpan end, out string? label)
+        {
+            label = null;
+            if (string.IsNullOrWhiteSpace(activeOverlapLabel))
+            {
+                return false;
+            }
+
+            if (!RangesOverlap(activeOverlapStart, activeOverlapEnd, start, end))
+            {
+                return false;
+            }
+
+            label = activeOverlapLabel;
+            return true;
+        }
+
+        private bool TryGetActiveSpeakerLabel(TimeSpan start, TimeSpan end, out string? label)
+        {
+            label = null;
+            if (string.IsNullOrWhiteSpace(activeSpeaker))
+            {
+                return false;
+            }
+
+            var hold = TimeSpan.FromSeconds(windowSamples / (double)sampleRate);
+            var effectiveEnd = activeSpeakerEnd + hold;
+            if (!RangesOverlap(activeSpeakerStart, effectiveEnd, start, end))
+            {
+                return false;
+            }
+
+            label = activeSpeaker;
+            return true;
+        }
+
+        private static bool RangesOverlap(TimeSpan startA, TimeSpan endA, TimeSpan startB, TimeSpan endB)
+        {
+            if (endA <= startA || endB <= startB)
+            {
+                return false;
+            }
+
+            return startA < endB && startB < endA;
         }
 
         private void FinalizeSegment(TimeSpan segmentEnd)
@@ -415,7 +613,7 @@ namespace Transcribe
                 if (candidateWindows >= minReturnSpeakerWindows
                     || (allowFastReturn && candidateWindows >= 1))
                 {
-                    SwitchToExistingSpeaker(best.Index, best.Label, embedding, candidateStart, windowEnd);
+                    SwitchToExistingSpeaker(best.Index, best.Label, embedding, windowStart, windowEnd);
                     ResetCandidate();
                 }
                 else if (activeSpeaker != null)
@@ -426,21 +624,21 @@ namespace Transcribe
             }
 
             AdvanceCandidateNew(embedding, windowStart);
-            if (candidateWindows >= minNewSpeakerWindows)
-            {
-                var candidateEmbedding = GetCandidateMeanEmbedding(embedding);
-                var bestCandidate = clusterer.FindBest(candidateEmbedding);
-                if (bestCandidate.Index >= 0 && bestCandidate.Score >= fallbackSimilarityThreshold)
+                if (candidateWindows >= minNewSpeakerWindows)
                 {
-                    SwitchToExistingSpeaker(bestCandidate.Index, bestCandidate.Label, candidateEmbedding, windowStart, windowEnd);
+                    var candidateEmbedding = GetCandidateMeanEmbedding(embedding);
+                    var bestCandidate = clusterer.FindBest(candidateEmbedding);
+                    if (bestCandidate.Index >= 0 && bestCandidate.Score >= fallbackSimilarityThreshold)
+                    {
+                        SwitchToExistingSpeaker(bestCandidate.Index, bestCandidate.Label, candidateEmbedding, candidateStart, windowEnd);
+                    }
+                    else
+                    {
+                        var newLabel = clusterer.CreateCluster(candidateEmbedding);
+                        SwitchToNewSpeaker(newLabel, candidateStart, windowEnd);
+                    }
+                    ResetCandidate();
                 }
-                else
-                {
-                    var newLabel = clusterer.CreateCluster(candidateEmbedding);
-                    SwitchToNewSpeaker(newLabel, windowStart, windowEnd);
-                }
-                ResetCandidate();
-            }
             else if (activeSpeaker != null)
             {
                 ExtendOrStartSpeakerSegment(activeSpeaker!, windowStart, windowEnd);
