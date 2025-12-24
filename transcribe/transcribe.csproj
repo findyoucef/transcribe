@@ -9,7 +9,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <TrimmerRootAssembly>Whisper.net</TrimmerRootAssembly>
     <NoWarn>$(NoWarn);IL3000</NoWarn>
-    <EnableComHosting>true</EnableComHosting>
     <EnableGeneratedComInterfaceComImportInterop>true</EnableGeneratedComInterfaceComImportInterop>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 	<AssemblyName>tx</AssemblyName>  
