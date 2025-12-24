@@ -8,6 +8,7 @@
         Width="1100" Height="1200"
         MinWidth="950" MinHeight="700"
         Title="Transcribe AI"
+        Icon="/Assets/icon.ico"
         Background="#1A1A1A">
 
   <Window.Resources>
