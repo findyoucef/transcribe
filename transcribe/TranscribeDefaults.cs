@@ -10,8 +10,8 @@ namespace Transcribe
         public const int DefaultChunkSeconds = 7;
         public const string DefaultOllamaUrl = "http://localhost:11434/";
         public const string DefaultOllamaModel = "tx-agent:latest";
-        public const string DefaultDiarizationModelFileName = "wespeaker_en_voxceleb_resnet293_LM.onnx";
-        public const string DefaultDiarizationConfigFileName = "voxceleb_resnet293_LM.json";
+        public const string DefaultDiarizationModelFileName = "voxceleb_resnet293_LM.onnx";
+        public const string DefaultDiarizationConfigFileName = "speaker_diarization.json";
         public const string DefaultDiarizationModelUrl =
             "https://wespeaker-1256283475.cos.ap-shanghai.myqcloud.com/models/voxceleb/voxceleb_resnet293_LM.onnx";
         public const float DefaultDiarizationSimilarityThreshold = 0.65f;
