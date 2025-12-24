@@ -96,6 +96,8 @@ namespace Transcribe
             return sampleRate * 2 * channels;
         }
 
+        public bool IsMicrophone => false;
+
         public void Dispose()
         {
             pcmData = null;

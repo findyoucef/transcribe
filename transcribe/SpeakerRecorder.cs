@@ -198,6 +198,8 @@ namespace Transcribe
             return captureFormat.AverageBytesPerSecond;
         }
 
+        public bool IsMicrophone => false;
+
         public void Dispose()
         {
             if (loopbackCapture != null)

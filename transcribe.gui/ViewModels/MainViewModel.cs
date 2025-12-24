@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using Avalonia.Threading;
@@ -39,6 +40,7 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public bool IsWindows => OperatingSystem.IsWindows();
+    public bool IsMacOS => OperatingSystem.IsMacOS();
 
     private string wavFilePath = "";
     public string WavFilePath
@@ -666,6 +668,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SaveOutputCommand { get; }
     public RelayCommand TranscribeWavCommand { get; }
     public RelayCommand OpenOutputFolderCommand { get; }
+    public RelayCommand<string> InstallBlackHoleCommand { get; }
 
     public MainViewModel(IWindowServices services)
     {
@@ -683,14 +686,10 @@ public sealed class MainViewModel : ObservableObject
         SaveOutputCommand = new RelayCommand(async () => await SaveCurrentAsync());
         TranscribeWavCommand = new RelayCommand(async () => await TranscribeWavAsync());
         OpenOutputFolderCommand = new RelayCommand(OpenOutputFolder);
+        InstallBlackHoleCommand = new RelayCommand<string>(InstallBlackHole);
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, _) => UpdateElapsed();
-
-        if (!OperatingSystem.IsWindows())
-        {
-            LogInfo("Live capture is Windows-only; file transcription is available via File -> Transcribe WAV...");
-        }
 
         SelectedLanguage = TranscribeDefaults.DefaultLanguage;
         SelectedModel = TranscribeDefaults.DefaultModel;
@@ -700,6 +699,47 @@ public sealed class MainViewModel : ObservableObject
         ValidateOutputFolder();
         ValidateOllamaUrl();
         ValidateWavFile();
+    }
+
+    private void InstallBlackHole(string? mode)
+    {
+        if (!IsMacOS) return;
+
+        try
+        {
+            if (string.Equals(mode, "brew", StringComparison.OrdinalIgnoreCase))
+            {
+                LogInfo("Installing via Homebrew...");
+                Process.Start("brew", "install --cask blackhole-2ch");
+            }
+            else
+            {
+                // Default to PKG
+                var appDir = AppContext.BaseDirectory;
+                // Check multiple depths for development vs published structure
+                var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
+                
+                if (!File.Exists(pkgPath))
+                {
+                    // Fallback for some build configurations
+                    pkgPath = Path.Combine(appDir, "..", "..", "..", "..", "installers", "BlackHole2ch-0.6.1.pkg");
+                }
+
+                if (File.Exists(pkgPath))
+                {
+                    LogInfo($"Opening installer: {pkgPath}");
+                    Process.Start("open", pkgPath);
+                }
+                else
+                {
+                    LogWarn($"Installer not found at: {pkgPath}. Please use Homebrew or download manually.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogError($"Installation error: {ex.Message}");
+        }
     }
 
     private static void RunOnUi(Action action)
@@ -778,24 +818,21 @@ public sealed class MainViewModel : ObservableObject
         // Keep a stable "Disabled" option for mic.
         MicDevices.Add(new DeviceItem(-1, "Disabled"));
 
-        if (OperatingSystem.IsWindows())
+        try
         {
-            try
+            foreach (var device in AudioCaptureFactory.GetSpeakers())
             {
-                foreach (var device in SpeakerRecorder.GetSpeakers())
-                {
-                    SpeakerDevices.Add(new DeviceItem(device.Index, device.Name));
-                }
+                SpeakerDevices.Add(new DeviceItem(device.Index, device.Name));
+            }
 
-                foreach (var device in MicrophoneRecorder.GetMicrophones())
-                {
-                    MicDevices.Add(new DeviceItem(device.Index, device.Name));
-                }
-            }
-            catch (Exception ex)
+            foreach (var device in AudioCaptureFactory.GetMicrophones())
             {
-                LogError($"Device enumeration failed: {ex.Message}");
+                MicDevices.Add(new DeviceItem(device.Index, device.Name));
             }
+        }
+        catch (Exception ex)
+        {
+            LogError($"Device enumeration failed: {ex.Message}");
         }
 
         SelectedSpeakerDevice ??= SpeakerDevices.FirstOrDefault();

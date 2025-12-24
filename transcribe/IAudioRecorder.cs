@@ -8,5 +8,6 @@ namespace Transcribe
         IEnumerable<byte[]> GetAudioChunks();
         MemoryStream CreateWavStream(byte[] audioData);
         int GetBytesPerSecond();
+        bool IsMicrophone { get; }
     }
 }

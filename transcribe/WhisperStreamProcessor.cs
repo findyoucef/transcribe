@@ -204,7 +204,7 @@ namespace Transcribe
                     int earlyThreshold = chunkSizeBytes; // default: no early processing
 
                     // Allow earlier processing only for microphone to reduce latency
-                    if (recorder is MicrophoneRecorder)
+                    if (recorder.IsMicrophone)
                     {
                         earlyThreshold = Math.Max(1, chunkSizeBytes / 3);
                     }
@@ -217,7 +217,7 @@ namespace Transcribe
                         AdvanceAudioCursor(audioToProcess.Length);
                         await ProcessAudioChunk(audioToProcess, baseOffset);
                     }
-                    else if (recorder is MicrophoneRecorder && audioBuffer.Count >= earlyThreshold)
+                    else if (recorder.IsMicrophone && audioBuffer.Count >= earlyThreshold)
                     {
                         var audioToProcess = audioBuffer.ToArray();
                         audioBuffer.Clear();

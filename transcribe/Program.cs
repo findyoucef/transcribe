@@ -35,7 +35,64 @@ namespace Transcribe
             var listSpeakersCommand = CreateListSpeakersCommand();
             rootCommand.AddCommand(listSpeakersCommand);
 
+            // Install BlackHole command
+            var installBlackHoleCommand = CreateInstallBlackHoleCommand();
+            rootCommand.AddCommand(installBlackHoleCommand);
+
             return await rootCommand.InvokeAsync(args);
+        }
+
+        private static Command CreateInstallBlackHoleCommand()
+        {
+            var brewOption = new Option<bool>(
+                name: "--brew",
+                description: "Install via Homebrew instead of the bundled PKG.",
+                getDefaultValue: () => false);
+
+            var command = new Command("install-blackhole", "Install BlackHole 2ch audio driver (macOS only)")
+            {
+                brewOption
+            };
+
+            command.SetHandler((bool useBrew) =>
+            {
+                if (!OperatingSystem.IsMacOS())
+                {
+                    Console.WriteLine("This command is only available on macOS.");
+                    return;
+                }
+
+                try
+                {
+                    if (useBrew)
+                    {
+                        Console.WriteLine("Installing BlackHole via Homebrew...");
+                        var process = Process.Start("brew", "install --cask blackhole-2ch");
+                        process.WaitForExit();
+                    }
+                    else
+                    {
+                        var appDir = AppContext.BaseDirectory;
+                        var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
+
+                        if (!File.Exists(pkgPath))
+                        {
+                            Console.WriteLine($"Bundled installer not found at: {pkgPath}");
+                            Console.WriteLine("Please install manually or use --brew.");
+                            return;
+                        }
+
+                        Console.WriteLine($"Opening installer: {pkgPath}");
+                        Process.Start("open", pkgPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error during installation: {ex.Message}");
+                }
+            }, brewOption);
+
+            return command;
         }
 
         private static Command CreateFileCommand()
@@ -424,7 +481,7 @@ namespace Transcribe
                     var micTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
                     {
                         DiarizationPipeline? diarization = null;
-                        using var recorder = new MicrophoneRecorder(deviceNumber: device);
+                        using var recorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: device);
                         try
                         {
                             if (diarizationResources != null)
@@ -500,7 +557,7 @@ namespace Transcribe
 
             listDevicesCommand.SetHandler(() =>
             {
-                MicrophoneRecorder.ListMicrophones();
+                AudioCaptureFactory.ListMicrophones();
             });
 
             return listDevicesCommand;
@@ -628,7 +685,7 @@ namespace Transcribe
                     Console.WriteLine("Press Ctrl+C to stop...");
                     Console.WriteLine();
 
-                    using var speakerRecorder = new SpeakerRecorder(deviceNumber: device);
+                    using var speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: device);
 
                     // Create shared transcript file path (GUID-based to match existing convention)
                     var sharedTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
@@ -657,11 +714,11 @@ namespace Transcribe
                             diarization: speakerDiarization);
 
                         // Optional mic
-                        MicrophoneRecorder? micRecorder = null;
+                        IAudioRecorder? micRecorder = null;
                         WhisperStreamProcessor? micProcessor = null;
                         if (micDevice >= 0)
                         {
-                            micRecorder = new MicrophoneRecorder(deviceNumber: micDevice, bufferMilliseconds: 50, useWasapiExclusive: false);
+                            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micDevice);
                             if (diarizationResources != null)
                             {
                                 var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
@@ -754,7 +811,7 @@ namespace Transcribe
 
             listSpeakersCommand.SetHandler(() =>
             {
-                SpeakerRecorder.ListSpeakers();
+                AudioCaptureFactory.ListSpeakers();
             });
 
             return listSpeakersCommand;

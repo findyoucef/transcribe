@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <None Include="..\transcribe\models\speaker_diarization.json" Link="models\speaker_diarization.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\installers\**" Link="installers\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

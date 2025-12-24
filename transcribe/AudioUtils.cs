@@ -10,14 +10,26 @@ namespace Transcribe
     {
         public static float[] ReadAudioFileAsMono(string path, int targetSampleRate)
         {
-            using var reader = new AudioFileReader(path);
-            ISampleProvider provider = EnsureMono(reader);
-            if (provider.WaveFormat.SampleRate != targetSampleRate)
+            if (path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
             {
-                provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+                using var reader = new WaveFileReader(path);
+                var provider = EnsureMono(reader.ToSampleProvider());
+                if (provider.WaveFormat.SampleRate != targetSampleRate)
+                {
+                    provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+                }
+                return ReadAllSamples(provider);
             }
-
-            return ReadAllSamples(provider);
+            else
+            {
+                using var reader = new AudioFileReader(path);
+                var provider = EnsureMono(reader);
+                if (provider.WaveFormat.SampleRate != targetSampleRate)
+                {
+                    provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+                }
+                return ReadAllSamples(provider);
+            }
         }
 
         public static float[] ReadWavBytesAsMono(byte[] wavBytes, int targetSampleRate)
@@ -31,6 +43,21 @@ namespace Transcribe
             }
 
             return ReadAllSamples(provider);
+        }
+
+        public static float CalculateMaxLevel(byte[] buffer)
+        {
+            float max = 0;
+            for (int i = 0; i < buffer.Length - 1; i += 2)
+            {
+                short sample = BitConverter.ToInt16(buffer, i);
+                float normalized = Math.Abs(sample / 32768f);
+                if (normalized > max)
+                {
+                    max = normalized;
+                }
+            }
+            return max;
         }
 
         private static ISampleProvider EnsureMono(ISampleProvider source)

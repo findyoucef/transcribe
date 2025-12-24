@@ -175,8 +175,6 @@
           <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
             <TextBlock Classes="sectionHeader" Text="Live Microphone" />
             
-            <TextBlock IsVisible="{Binding IsWindows, Converter={StaticResource Not}}" Classes="warning" Text="Live microphone capture is only supported on Windows." Margin="0,0,0,10" />
-
             <Border Classes="card">
                <StackPanel Spacing="{DynamicResource RowGap}">
                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="{DynamicResource SpaceM}" RowSpacing="{DynamicResource RowGap}">
@@ -319,7 +317,13 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="{DynamicResource SpaceL}" Margin="{DynamicResource PadL}">
              <TextBlock Classes="sectionHeader" Text="System Audio Capture" />
-             <TextBlock IsVisible="{Binding IsWindows, Converter={StaticResource Not}}" Classes="warning" Text="Live speaker capture is only supported on Windows." Margin="0,0,0,10" />
+             <TextBlock IsVisible="{Binding IsWindows, Converter={StaticResource Not}}" Classes="muted" Text="Non-Windows: Select a loopback device (e.g. BlackHole on macOS, Monitor on Linux)." Margin="0,0,0,10" />
+
+             <StackPanel IsVisible="{Binding IsMacOS}" Margin="0,0,0,10" Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="macOS Driver:" VerticalAlignment="Center" Classes="muted" />
+                <Button Content="Install (Bundled PKG)" Command="{Binding InstallBlackHoleCommand}" CommandParameter="pkg" Classes="secondary" />
+                <Button Content="Install (Homebrew)" Command="{Binding InstallBlackHoleCommand}" CommandParameter="brew" Classes="secondary" />
+             </StackPanel>
 
             <Border Classes="card">
                <StackPanel Spacing="{DynamicResource RowGap}">
