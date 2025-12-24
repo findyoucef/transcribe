@@ -785,8 +785,8 @@ namespace Transcribe
 
             var modelUrlOption = new Option<string?>(
                 name: "--diarization-model-url",
-                description: "URL to download the diarization ONNX model if it is missing.",
-                getDefaultValue: () => null);
+                description: $"URL to download the diarization ONNX model if it is missing. Default: {TranscribeDefaults.DefaultDiarizationModelUrl}",
+                getDefaultValue: () => TranscribeDefaults.DefaultDiarizationModelUrl);
 
             var configPathOption = new Option<string?>(
                 name: "--diarization-config",

@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\transcribe\models\wespeaker_en_voxceleb_resnet293_LM.json" Link="models\wespeaker_en_voxceleb_resnet293_LM.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\transcribe\models\voxceleb_resnet293_LM.json" Link="models\voxceleb_resnet293_LM.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

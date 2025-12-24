@@ -222,7 +222,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string diarizationModelUrl = "";
+    private string diarizationModelUrl = TranscribeDefaults.DefaultDiarizationModelUrl;
     public string DiarizationModelUrl
     {
         get => diarizationModelUrl;
@@ -741,7 +741,7 @@ public sealed class MainViewModel : ObservableObject
         EnableDiarization = false;
         DiarizationAdvanced = false;
         DiarizationModelPath = "";
-        DiarizationModelUrl = "";
+        DiarizationModelUrl = TranscribeDefaults.DefaultDiarizationModelUrl;
         DiarizationConfigPath = "";
         DiarizationSimilarityThreshold = TranscribeDefaults.DefaultDiarizationSimilarityThreshold;
         DiarizationFallbackSimilarityThreshold = TranscribeDefaults.DefaultDiarizationFallbackSimilarity;
