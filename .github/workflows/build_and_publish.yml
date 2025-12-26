@@ -135,6 +135,27 @@ jobs:
         asset_name: transcribe-${{env.CLI_RELEASE}}-winx64.zip
         asset_content_type: application/zip  
 
+    - name: Build and publish CLI
+      run: dotnet publish transcribe --configuration Release --self-contained true --runtime win-x64 /p:PublishSingleFile=true /p:PublishTrimmed=false /p:Version=${{env.CLI_RELEASE}} -o ./published/win-x64-cli
+
+    - name: Zip Artifact CLI
+      uses: vimtor/action-zip@v1.1
+      with:
+        files: ./published/win-x64-cli/
+        recursive: true
+        dest: transcribe-cli-${{env.CLI_RELEASE}}-winx64.zip
+
+    - name: Upload CLI Release Asset
+      id: upload-release-asset-cli
+      uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
+      with:
+        upload_url: ${{env.CLI_RELEASE_URL}}
+        asset_path: transcribe-cli-${{env.CLI_RELEASE}}-winx64.zip
+        asset_name: transcribe-cli-${{env.CLI_RELEASE}}-winx64.zip
+        asset_content_type: application/zip          
+
   linux-build:
     needs:  [version-control]
     runs-on: ubuntu-latest
@@ -193,7 +214,28 @@ jobs:
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-${{env.CLI_RELEASE}}-linux-x64.zip
         asset_name: transcribe-${{env.CLI_RELEASE}}-linux-x64.zip
-        asset_content_type: application/zip  
+        asset_content_type: application/zip
+
+    - name: Build and publish CLI
+      run: dotnet publish transcribe --configuration Release --self-contained true --runtime linux-x64 /p:PublishSingleFile=true /p:PublishTrimmed=false /p:Version=${{env.CLI_RELEASE}} -o ./published/linux-x64-cli
+
+    - name: Zip Artifact CLI
+      uses: vimtor/action-zip@v1.1
+      with:
+        files: ./published/linux-x64-cli
+        recursive: true
+        dest: transcribe-cli-${{env.CLI_RELEASE}}-linux-x64.zip
+
+    - name: Upload CLI Release Asset
+      id: upload-release-asset-cli
+      uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
+      with:
+        upload_url: ${{env.CLI_RELEASE_URL}}
+        asset_path: transcribe-cli-${{env.CLI_RELEASE}}-linux-x64.zip
+        asset_name: transcribe-cli-${{env.CLI_RELEASE}}-linux-x64.zip
+        asset_content_type: application/zip         
 
   osx-build:
     needs:  [version-control]
@@ -254,4 +296,25 @@ jobs:
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip
         asset_name: transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip
-        asset_content_type: application/zip  
+        asset_content_type: application/zip
+
+    - name: Build and publish CLI
+      run: dotnet publish transcribe --configuration Release --self-contained true --runtime osx-arm64 /p:PublishSingleFile=true /p:PublishTrimmed=false /p:Version=${{env.CLI_RELEASE}} -o ./published/osx-arm64-cli
+
+    - name: Zip Artifact CLI
+      uses: vimtor/action-zip@v1.1
+      with:
+        files: ./published/osx-arm64-cli/
+        recursive: true
+        dest: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip
+
+    - name: Upload CLI Release Asset
+      id: upload-release-asset-cli
+      uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
+      with:
+        upload_url: ${{env.CLI_RELEASE_URL}}
+        asset_path: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip 
+        asset_name: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip 
+        asset_content_type: application/zip         
