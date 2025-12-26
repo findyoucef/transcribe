@@ -414,6 +414,11 @@ namespace Transcribe.PortAudio
                 return new ToMonoSampleProvider(source);
             }
 
+            if (source.WaveFormat.Channels == 1 && targetChannels > 1)
+            {
+                return new MonoToMultiSampleProvider(source, targetChannels);
+            }
+
             return source;
         }
 
@@ -454,6 +459,49 @@ namespace Transcribe.PortAudio
                 }
 
                 return frames;
+            }
+        }
+
+        private sealed class MonoToMultiSampleProvider : ISampleProvider
+        {
+            private readonly ISampleProvider source;
+            private readonly int targetChannels;
+            private float[] sourceBuffer = Array.Empty<float>();
+
+            public MonoToMultiSampleProvider(ISampleProvider source, int targetChannels)
+            {
+                this.source = source;
+                this.targetChannels = Math.Max(1, targetChannels);
+                WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.WaveFormat.SampleRate, this.targetChannels);
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int framesRequested = count / targetChannels;
+                if (framesRequested <= 0)
+                {
+                    return 0;
+                }
+
+                if (sourceBuffer.Length < framesRequested)
+                {
+                    sourceBuffer = new float[framesRequested];
+                }
+
+                int framesRead = source.Read(sourceBuffer, 0, framesRequested);
+                for (int frame = 0; frame < framesRead; frame++)
+                {
+                    float sample = sourceBuffer[frame];
+                    int baseIndex = offset + (frame * targetChannels);
+                    for (int ch = 0; ch < targetChannels; ch++)
+                    {
+                        buffer[baseIndex + ch] = sample;
+                    }
+                }
+
+                return framesRead * targetChannels;
             }
         }
     }
