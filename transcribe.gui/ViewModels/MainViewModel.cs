@@ -17,8 +17,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly StringBuilder transcriptBuilder = new();
     private readonly StringBuilder summaryBuilder = new();
 
-    private SpeakerRecorder? speakerRecorder;
-    private MicrophoneRecorder? micRecorder;
+    private IAudioRecorder? speakerRecorder;
+    private IAudioRecorder? micRecorder;
     private WhisperStreamProcessor? speakerProcessor;
     private WhisperStreamProcessor? micProcessor;
     private TranscriptionMerger? merger;
@@ -989,12 +989,6 @@ public sealed class MainViewModel : ObservableObject
             return false;
         }
 
-        if (SelectedModeIndex is 1 or 2 && !OperatingSystem.IsWindows())
-        {
-            reason = "Live capture is only supported on Windows.";
-            return false;
-        }
-
         if (SelectedModeIndex == 0)
         {
             if (string.IsNullOrWhiteSpace(WavFilePath))
@@ -1244,7 +1238,7 @@ public sealed class MainViewModel : ObservableObject
                 diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
             }
 
-            micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
             micProcessor = new WhisperStreamProcessor(
                 modelPath,
                 language,
@@ -1286,7 +1280,7 @@ public sealed class MainViewModel : ObservableObject
 
         var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
 
-        speakerRecorder = new SpeakerRecorder(deviceNumber: speakerIndex);
+        speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: speakerIndex);
         merger = new TranscriptionMerger(transcriptPath, TimeSpan.FromSeconds(3));
 
         DiarizationPipeline? speakerDiarization = null;
@@ -1315,7 +1309,7 @@ public sealed class MainViewModel : ObservableObject
 
             if (micIndex >= 0)
             {
-                micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
                 if (diarizationResources != null)
                 {
                     var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
@@ -1673,5 +1667,4 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 }
-
 

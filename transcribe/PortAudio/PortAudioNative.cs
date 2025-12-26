@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.IO;
 
 namespace Transcribe.PortAudio
 {
@@ -147,13 +148,43 @@ namespace Transcribe.PortAudio
             {
                 return handle;
             }
+            if (NativeLibrary.TryLoad("libportaudio.dylib", assembly, searchPath, out handle))
+            {
+                return handle;
+            }
             if (NativeLibrary.TryLoad("libportaudio.so.2", assembly, searchPath, out handle))
+            {
+                return handle;
+            }
+            if (NativeLibrary.TryLoad("libportaudio.so", assembly, searchPath, out handle))
             {
                 return handle;
             }
             if (NativeLibrary.TryLoad("portaudio.dll", assembly, searchPath, out handle))
             {
                 return handle;
+            }
+
+            var baseDir = AppContext.BaseDirectory;
+            if (!string.IsNullOrWhiteSpace(baseDir))
+            {
+                var candidates = new[]
+                {
+                    "libportaudio.2.dylib",
+                    "libportaudio.dylib",
+                    "libportaudio.so.2",
+                    "libportaudio.so",
+                    "portaudio.dll"
+                };
+
+                foreach (var candidate in candidates)
+                {
+                    var path = Path.Combine(baseDir, candidate);
+                    if (File.Exists(path) && NativeLibrary.TryLoad(path, assembly, searchPath, out handle))
+                    {
+                        return handle;
+                    }
+                }
             }
 
             // Fallback for direct linkage or system path

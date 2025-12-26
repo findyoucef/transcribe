@@ -32,7 +32,8 @@ public sealed class App : Application
     {
         try
         {
-            var iconUri = new Uri("avares://transcribe.gui/Assets/icon.ico");
+            var assemblyName = typeof(App).Assembly.GetName().Name ?? "txgui";
+            var iconUri = new Uri($"avares://{assemblyName}/Assets/icon.ico");
             using var stream = AssetLoader.Open(iconUri);
             var icon = new WindowIcon(stream);
 
@@ -117,4 +118,3 @@ public sealed class App : Application
         }
     }
 }
-
