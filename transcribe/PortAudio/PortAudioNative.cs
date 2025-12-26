@@ -180,7 +180,7 @@ namespace Transcribe.PortAudio
                 foreach (var candidate in candidates)
                 {
                     var path = Path.Combine(baseDir, candidate);
-                    if (File.Exists(path) && NativeLibrary.TryLoad(path, assembly, searchPath, out handle))
+                    if (NativeLibrary.TryLoad(path, assembly, searchPath, out handle))
                     {
                         return handle;
                     }
