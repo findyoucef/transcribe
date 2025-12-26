@@ -36,6 +36,7 @@ Notes:
 - Live mic/speaker capture works on Windows/macOS/Linux (PortAudio on non-Windows).
 - System audio capture on macOS requires a loopback driver (see BlackHole setup below).
 - Linux arm64 users need to supply their own PortAudio native library.
+- On macOS and Windows (e.g., Git Bash/MSYS), you may need to mark `txgui` as executable: `chmod +x txgui`.
 
 ### Commands
 - `file`: transcribe a WAV file.
