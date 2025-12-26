@@ -330,7 +330,8 @@ namespace Transcribe.PortAudio
 
             var streamResampled = new MemoryStream();
             var sourceFormat = new WaveFormat(actualSampleRate, 16, actualChannels);
-            using (var sourceStream = new RawSourceWaveStream(new MemoryStream(audioData), sourceFormat))
+            using (var sourceMemoryStream = new MemoryStream(audioData))
+            using (var sourceStream = new RawSourceWaveStream(sourceMemoryStream, sourceFormat))
             {
                 ISampleProvider provider = sourceStream.ToSampleProvider();
                 provider = EnsureChannelCount(provider, targetChannels);
