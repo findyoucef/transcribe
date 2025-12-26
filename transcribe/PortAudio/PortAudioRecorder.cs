@@ -353,9 +353,8 @@ namespace Transcribe.PortAudio
                 }
             }
 
-            var finalStream = new MemoryStream(streamResampled.ToArray());
-            finalStream.Position = 0;
-            return finalStream;
+            streamResampled.Position = 0;
+            return streamResampled;
         }
 
         public void Dispose()
