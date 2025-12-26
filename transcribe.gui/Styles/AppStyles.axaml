@@ -50,7 +50,7 @@
 
   <Style Selector="TextBox.viewer">
     <Setter Property="FontFamily" Value="Consolas, monospace" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Background" Value="#151515" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Height" Value="NaN" />
@@ -143,6 +143,17 @@
   
   <Style Selector="TabControl.sidebar > TabItem:pointerover">
     <Setter Property="Background" Value="#252525" />
+  </Style>
+
+  <!-- Output Tabs Style -->
+  <Style Selector="TabControl.outputTabs">
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="TabControl.outputTabs > TabItem">
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Normal" />
   </Style>
 
 </Styles>
