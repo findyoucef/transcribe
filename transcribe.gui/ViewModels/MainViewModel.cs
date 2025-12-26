@@ -17,8 +17,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly StringBuilder transcriptBuilder = new();
     private readonly StringBuilder summaryBuilder = new();
 
-    private SpeakerRecorder? speakerRecorder;
-    private MicrophoneRecorder? micRecorder;
+    private IAudioRecorder? speakerRecorder;
+    private IAudioRecorder? micRecorder;
     private WhisperStreamProcessor? speakerProcessor;
     private WhisperStreamProcessor? micProcessor;
     private TranscriptionMerger? merger;
@@ -668,7 +668,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SaveOutputCommand { get; }
     public RelayCommand TranscribeWavCommand { get; }
     public RelayCommand OpenOutputFolderCommand { get; }
-    public RelayCommand<string> InstallBlackHoleCommand { get; }
+    public RelayCommand InstallBlackHoleCommand { get; }
 
     public MainViewModel(IWindowServices services)
     {
@@ -686,7 +686,7 @@ public sealed class MainViewModel : ObservableObject
         SaveOutputCommand = new RelayCommand(async () => await SaveCurrentAsync());
         TranscribeWavCommand = new RelayCommand(async () => await TranscribeWavAsync());
         OpenOutputFolderCommand = new RelayCommand(OpenOutputFolder);
-        InstallBlackHoleCommand = new RelayCommand<string>(InstallBlackHole);
+        InstallBlackHoleCommand = new RelayCommand(InstallBlackHole);
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, _) => UpdateElapsed();
@@ -701,39 +701,31 @@ public sealed class MainViewModel : ObservableObject
         ValidateWavFile();
     }
 
-    private void InstallBlackHole(string? mode)
+    private void InstallBlackHole()
     {
         if (!IsMacOS) return;
 
         try
         {
-            if (string.Equals(mode, "brew", StringComparison.OrdinalIgnoreCase))
+            // Default to PKG
+            var appDir = AppContext.BaseDirectory;
+            // Check multiple depths for development vs published structure
+            var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
+            
+            if (!File.Exists(pkgPath))
             {
-                LogInfo("Installing via Homebrew...");
-                Process.Start("brew", "install --cask blackhole-2ch");
+                // Fallback for some build configurations
+                pkgPath = Path.Combine(appDir, "..", "..", "..", "..", "installers", "BlackHole2ch-0.6.1.pkg");
+            }
+
+            if (File.Exists(pkgPath))
+            {
+                LogInfo($"Opening installer: {pkgPath}");
+                Process.Start("open", pkgPath);
             }
             else
             {
-                // Default to PKG
-                var appDir = AppContext.BaseDirectory;
-                // Check multiple depths for development vs published structure
-                var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
-                
-                if (!File.Exists(pkgPath))
-                {
-                    // Fallback for some build configurations
-                    pkgPath = Path.Combine(appDir, "..", "..", "..", "..", "installers", "BlackHole2ch-0.6.1.pkg");
-                }
-
-                if (File.Exists(pkgPath))
-                {
-                    LogInfo($"Opening installer: {pkgPath}");
-                    Process.Start("open", pkgPath);
-                }
-                else
-                {
-                    LogWarn($"Installer not found at: {pkgPath}. Please use Homebrew or download manually.");
-                }
+                LogWarn($"Installer not found at: {pkgPath}. Download it manually.");
             }
         }
         catch (Exception ex)
@@ -989,12 +981,6 @@ public sealed class MainViewModel : ObservableObject
             return false;
         }
 
-        if (SelectedModeIndex is 1 or 2 && !OperatingSystem.IsWindows())
-        {
-            reason = "Live capture is only supported on Windows.";
-            return false;
-        }
-
         if (SelectedModeIndex == 0)
         {
             if (string.IsNullOrWhiteSpace(WavFilePath))
@@ -1244,7 +1230,7 @@ public sealed class MainViewModel : ObservableObject
                 diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
             }
 
-            micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
             micProcessor = new WhisperStreamProcessor(
                 modelPath,
                 language,
@@ -1286,7 +1272,7 @@ public sealed class MainViewModel : ObservableObject
 
         var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
 
-        speakerRecorder = new SpeakerRecorder(deviceNumber: speakerIndex);
+        speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: speakerIndex);
         merger = new TranscriptionMerger(transcriptPath, TimeSpan.FromSeconds(3));
 
         DiarizationPipeline? speakerDiarization = null;
@@ -1315,7 +1301,7 @@ public sealed class MainViewModel : ObservableObject
 
             if (micIndex >= 0)
             {
-                micRecorder = new MicrophoneRecorder(deviceNumber: micIndex, bufferMilliseconds: 50, useWasapiExclusive: false);
+                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
                 if (diarizationResources != null)
                 {
                     var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
@@ -1673,5 +1659,3 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 }
-
-
