@@ -4,7 +4,7 @@ Command-line transcription using Whisper. Supports batch WAV transcription, real
 
 ## Requirements
 - .NET 10 SDK
-- Windows audio stack (NAudio WASAPI) for live mic/speaker capture
+- Live capture uses WASAPI on Windows and PortAudio on macOS/Linux (bundled)
 - Optional: running Ollama server at `http://localhost:11434/` with model `tx-agent:latest` for summaries
 
 ## Build
@@ -33,7 +33,8 @@ dotnet publish transcribe.gui -c Release -r osx-arm64 --self-contained true
 
 Notes:
 - File transcription works cross-platform.
-- Live mic/speaker capture is Windows-only (NAudio WASAPI).
+- Live mic/speaker capture works on Windows/macOS/Linux (PortAudio on non-Windows).
+- System audio capture on macOS requires a loopback driver (see BlackHole setup below).
 
 ### Commands
 - `file`: transcribe a WAV file.
@@ -69,12 +70,22 @@ Notes:
 ```bash
 ./transcribe speaker [--device <number>] [--chunk-size <seconds>] [--model <name>] [--language <code>] [--mic-device <number>] [--summarize]
 ```
-- Captures system output via WASAPI loopback.
+- Captures system output via WASAPI loopback on Windows or a loopback input on macOS/Linux.
 - Optionally capture your mic simultaneously (`--mic-device <n>`, default `-1` disables). Speaker and mic audio are processed separately and merged chronologically into one transcript.
 - Same defaults and output behavior as microphone mode (chunk `3s`, device `0`, summary disabled by default).
 - Add `--summarize` to stream a summary via Ollama after transcription finishes.
 - List speakers first with `./transcribe list-speakers`.
  - Use `--output-dir <folder>` to write the transcript somewhere other than the working directory.
+
+### macOS system audio capture (BlackHole)
+To capture system audio on macOS, install a loopback device and route output to it.
+
+1) Install BlackHole (GUI includes a bundled PKG under `installers/` or use `./transcribe install-blackhole`).
+2) Open `Audio MIDI Setup` and create a `Multi-Output Device`.
+3) In the Multi-Output Device, check both your speakers/headphones and `BlackHole 2ch`.
+4) Set the Multi-Output Device as the system output in System Settings > Sound.
+5) In Transcribe, select `BlackHole 2ch` as the speaker device.
+6) Ensure sample rates match (usually 48k) for the Multi-Output Device and BlackHole in Audio MIDI Setup.
 
 ### Models
 Supported values (downloaded on first use into the app’s binary directory):
@@ -105,4 +116,5 @@ Examples:
 - Network is required only for the initial model download (and Ollama summaries if enabled).
 - Standard PCM WAV input works best; malformed headers will skip progress reporting.
 - Live modes write transcript files in the working directory using GUID names; make sure it is writable.
-- Audio processing uses NAudio WASAPI. If a device index is invalid, the app will list the range to help pick a valid one.
+- On macOS, grant microphone permissions to the app if prompted.
+- Audio processing uses WASAPI (Windows) or PortAudio (macOS/Linux). If a device index is invalid, the app will list the range to help pick a valid one.

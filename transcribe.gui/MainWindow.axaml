@@ -322,8 +322,7 @@
 
              <StackPanel IsVisible="{Binding IsMacOS}" Margin="0,0,0,10" Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="macOS Driver:" VerticalAlignment="Center" Classes="muted" />
-                <Button Content="Install (Bundled PKG)" Command="{Binding InstallBlackHoleCommand}" CommandParameter="pkg" Classes="secondary" />
-                <Button Content="Install (Homebrew)" Command="{Binding InstallBlackHoleCommand}" CommandParameter="brew" Classes="secondary" />
+                <Button Content="Install (Bundled PKG)" Command="{Binding InstallBlackHoleCommand}" Classes="secondary" />
              </StackPanel>
 
             <Border Classes="card">

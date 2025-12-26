@@ -668,7 +668,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SaveOutputCommand { get; }
     public RelayCommand TranscribeWavCommand { get; }
     public RelayCommand OpenOutputFolderCommand { get; }
-    public RelayCommand<string> InstallBlackHoleCommand { get; }
+    public RelayCommand InstallBlackHoleCommand { get; }
 
     public MainViewModel(IWindowServices services)
     {
@@ -686,7 +686,7 @@ public sealed class MainViewModel : ObservableObject
         SaveOutputCommand = new RelayCommand(async () => await SaveCurrentAsync());
         TranscribeWavCommand = new RelayCommand(async () => await TranscribeWavAsync());
         OpenOutputFolderCommand = new RelayCommand(OpenOutputFolder);
-        InstallBlackHoleCommand = new RelayCommand<string>(InstallBlackHole);
+        InstallBlackHoleCommand = new RelayCommand(InstallBlackHole);
 
         timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         timer.Tick += (_, _) => UpdateElapsed();
@@ -701,39 +701,31 @@ public sealed class MainViewModel : ObservableObject
         ValidateWavFile();
     }
 
-    private void InstallBlackHole(string? mode)
+    private void InstallBlackHole()
     {
         if (!IsMacOS) return;
 
         try
         {
-            if (string.Equals(mode, "brew", StringComparison.OrdinalIgnoreCase))
+            // Default to PKG
+            var appDir = AppContext.BaseDirectory;
+            // Check multiple depths for development vs published structure
+            var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
+            
+            if (!File.Exists(pkgPath))
             {
-                LogInfo("Installing via Homebrew...");
-                Process.Start("brew", "install --cask blackhole-2ch");
+                // Fallback for some build configurations
+                pkgPath = Path.Combine(appDir, "..", "..", "..", "..", "installers", "BlackHole2ch-0.6.1.pkg");
+            }
+
+            if (File.Exists(pkgPath))
+            {
+                LogInfo($"Opening installer: {pkgPath}");
+                Process.Start("open", pkgPath);
             }
             else
             {
-                // Default to PKG
-                var appDir = AppContext.BaseDirectory;
-                // Check multiple depths for development vs published structure
-                var pkgPath = Path.Combine(appDir, "installers", "BlackHole2ch-0.6.1.pkg");
-                
-                if (!File.Exists(pkgPath))
-                {
-                    // Fallback for some build configurations
-                    pkgPath = Path.Combine(appDir, "..", "..", "..", "..", "installers", "BlackHole2ch-0.6.1.pkg");
-                }
-
-                if (File.Exists(pkgPath))
-                {
-                    LogInfo($"Opening installer: {pkgPath}");
-                    Process.Start("open", pkgPath);
-                }
-                else
-                {
-                    LogWarn($"Installer not found at: {pkgPath}. Please use Homebrew or download manually.");
-                }
+                LogWarn($"Installer not found at: {pkgPath}. Download it manually.");
             }
         }
         catch (Exception ex)
@@ -1667,4 +1659,3 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 }
-
