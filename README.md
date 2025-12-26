@@ -1,6 +1,6 @@
 # Transcribe
 
-Command-line transcription using Whisper. Supports batch WAV transcription, real-time mic capture, speaker/output capture, optional dual-source (speaker + mic) transcription, and post-run summarization via Ollama. Live modes show audio levels and write timestamped text.
+GUI and CLI transcription using Whisper. Supports batch WAV transcription, real-time mic capture, speaker/output capture, optional dual-source (speaker + mic) transcription, diarization and post-run summarization via Ollama. Live modes show speakers and write timestamped text.
 
 ## Requirements
 - .NET 10 SDK
