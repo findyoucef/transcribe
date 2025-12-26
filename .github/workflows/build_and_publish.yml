@@ -1,4 +1,4 @@
-name: Build and Publish .NET AOT Binaries
+name: Build and Publish .NET GUI Binaries
 
 on:
   workflow_dispatch:
