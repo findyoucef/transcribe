@@ -35,6 +35,7 @@ Notes:
 - File transcription works cross-platform.
 - Live mic/speaker capture works on Windows/macOS/Linux (PortAudio on non-Windows).
 - System audio capture on macOS requires a loopback driver (see BlackHole setup below).
+- Linux arm64 users need to supply their own PortAudio native library.
 
 ### Commands
 - `file`: transcribe a WAV file.
@@ -86,6 +87,14 @@ To capture system audio on macOS, install a loopback device and route output to 
 4) Set the Multi-Output Device as the system output in System Settings > Sound.
 5) In Transcribe, select `BlackHole 2ch` as the speaker device.
 6) Ensure sample rates match (usually 48k) for the Multi-Output Device and BlackHole in Audio MIDI Setup.
+
+### Linux system audio capture (PulseAudio/PipeWire)
+System audio capture on Linux uses a loopback/monitor input.
+
+1) Install `pavucontrol` (or your desktop audio control panel).
+2) Play audio, then open the device list and select a source named `Monitor of ...` for the speaker capture input.
+3) If you do not see a monitor input, confirm PulseAudio/PipeWire is running and that your output device exposes a monitor source.
+4) Use `./transcribe list-speakers` to find the monitor device index.
 
 ### Models
 Supported values (downloaded on first use into the app’s binary directory):

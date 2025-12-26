@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using NAudio.Wave; // For WaveFileWriter helper if needed, though we can write raw headers
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace Transcribe.PortAudio
 {
@@ -8,8 +9,8 @@ namespace Transcribe.PortAudio
     {
         private IntPtr stream = IntPtr.Zero;
         private readonly int deviceIndex;
-        private readonly int sampleRate;
-        private readonly int channels;
+        private readonly int targetSampleRate;
+        private readonly int targetChannels;
         private readonly bool isLoopback;
         private readonly BlockingCollection<byte[]> audioChunks = new();
         private bool isRecording;
@@ -17,13 +18,18 @@ namespace Transcribe.PortAudio
         private Task? captureTask;
         private float currentLevel;
         private bool disposed;
+        private int actualSampleRate;
+        private int actualChannels;
+        private bool needsResample;
 
         public PortAudioRecorder(int deviceIndex, int sampleRate = 16000, int channels = 1, bool isLoopback = false)
         {
             this.deviceIndex = deviceIndex;
-            this.sampleRate = sampleRate;
-            this.channels = channels;
+            targetSampleRate = sampleRate;
+            targetChannels = channels;
             this.isLoopback = isLoopback;
+            actualSampleRate = sampleRate;
+            actualChannels = channels;
 
             var err = PortAudioNative.Pa_Initialize();
             if (err != PortAudioNative.PaError.paNoError)
@@ -179,29 +185,34 @@ namespace Transcribe.PortAudio
         {
             if (isRecording) return;
 
-            var inputParams = new PortAudioNative.PaStreamParameters
+            needsResample = false;
+            var err = TryOpenStream(deviceIndex, targetSampleRate, targetChannels, out stream);
+            if (err == PortAudioNative.PaError.paNoError)
             {
-                device = deviceIndex,
-                channelCount = channels,
-                sampleFormat = PortAudioNative.PaSampleFormat.paInt16, // Capture 16-bit directly
-                suggestedLatency = 0.1, // 100ms
-                hostApiSpecificStreamInfo = IntPtr.Zero
-            };
-
-            var err = PortAudioNative.Pa_OpenStream(
-                out stream,
-                ref inputParams,
-                IntPtr.Zero, // No output
-                sampleRate,
-                0, // Frames per buffer (0 = auto)
-                PortAudioNative.PaStreamFlags.paClipOff,
-                IntPtr.Zero, // Blocking mode
-                IntPtr.Zero
-            );
-
-            if (err != PortAudioNative.PaError.paNoError)
+                actualSampleRate = targetSampleRate;
+                actualChannels = targetChannels;
+            }
+            else
             {
-                throw new Exception($"Failed to open PortAudio stream: {err}");
+                var infoPtr = PortAudioNative.Pa_GetDeviceInfo(deviceIndex);
+                if (infoPtr == IntPtr.Zero)
+                {
+                    throw new Exception($"Failed to open PortAudio stream: {err}");
+                }
+
+                var info = Marshal.PtrToStructure<PortAudioNative.PaDeviceInfo>(infoPtr);
+                var fallbackSampleRate = (int)Math.Round(info.defaultSampleRate);
+                var fallbackChannels = ResolveFallbackChannels(info);
+
+                err = TryOpenStream(deviceIndex, fallbackSampleRate, fallbackChannels, out stream);
+                if (err != PortAudioNative.PaError.paNoError)
+                {
+                    throw new Exception($"Failed to open PortAudio stream: {err}");
+                }
+
+                actualSampleRate = fallbackSampleRate;
+                actualChannels = fallbackChannels;
+                needsResample = actualSampleRate != targetSampleRate || actualChannels != targetChannels;
             }
 
             err = PortAudioNative.Pa_StartStream(stream);
@@ -220,7 +231,7 @@ namespace Transcribe.PortAudio
         private void CaptureLoop(CancellationToken token)
         {
             const int framesPerRead = 1024; // Small chunks
-            int frameSize = channels * 2; // 16-bit = 2 bytes
+            int frameSize = actualChannels * 2; // 16-bit = 2 bytes
             int bufferSize = framesPerRead * frameSize;
             var buffer = new byte[bufferSize];
 
@@ -282,38 +293,68 @@ namespace Transcribe.PortAudio
 
         public int GetBytesPerSecond()
         {
-            return sampleRate * channels * 2;
+            var sr = actualSampleRate > 0 ? actualSampleRate : targetSampleRate;
+            var ch = actualChannels > 0 ? actualChannels : targetChannels;
+            return sr * ch * 2;
         }
 
         public MemoryStream CreateWavStream(byte[] audioData)
         {
-            // Simple WAV header writer
-            var stream = new MemoryStream();
-            var writer = new BinaryWriter(stream);
+            if (!needsResample)
+            {
+                // Simple WAV header writer for native capture format
+                var stream = new MemoryStream();
+                var writer = new BinaryWriter(stream);
 
-            // RIFF header
-            writer.Write("RIFF".ToCharArray());
-            writer.Write(36 + audioData.Length);
-            writer.Write("WAVE".ToCharArray());
+                writer.Write("RIFF".ToCharArray());
+                writer.Write(36 + audioData.Length);
+                writer.Write("WAVE".ToCharArray());
 
-            // fmt chunk
-            writer.Write("fmt ".ToCharArray());
-            writer.Write(16); // Chunk size
-            writer.Write((short)1); // PCM
-            writer.Write((short)channels);
-            writer.Write(sampleRate);
-            writer.Write(sampleRate * channels * 2); // Byte rate
-            writer.Write((short)(channels * 2)); // Block align
-            writer.Write((short)16); // Bits per sample
+                writer.Write("fmt ".ToCharArray());
+                writer.Write(16); // Chunk size
+                writer.Write((short)1); // PCM
+                writer.Write((short)actualChannels);
+                writer.Write(actualSampleRate);
+                writer.Write(actualSampleRate * actualChannels * 2); // Byte rate
+                writer.Write((short)(actualChannels * 2)); // Block align
+                writer.Write((short)16); // Bits per sample
 
-            // data chunk
-            writer.Write("data".ToCharArray());
-            writer.Write(audioData.Length);
-            writer.Write(audioData);
-            writer.Flush();
+                writer.Write("data".ToCharArray());
+                writer.Write(audioData.Length);
+                writer.Write(audioData);
+                writer.Flush();
 
-            stream.Position = 0;
-            return stream;
+                stream.Position = 0;
+                return stream;
+            }
+
+            var streamResampled = new MemoryStream();
+            var sourceFormat = new WaveFormat(actualSampleRate, 16, actualChannels);
+            using (var sourceStream = new RawSourceWaveStream(new MemoryStream(audioData), sourceFormat))
+            {
+                ISampleProvider provider = sourceStream.ToSampleProvider();
+                provider = EnsureChannelCount(provider, targetChannels);
+                if (provider.WaveFormat.SampleRate != targetSampleRate)
+                {
+                    provider = new WdlResamplingSampleProvider(provider, targetSampleRate);
+                }
+
+                var waveProvider = new SampleToWaveProvider16(provider);
+                using (var writer = new WaveFileWriter(streamResampled, waveProvider.WaveFormat))
+                {
+                    var buffer = new byte[waveProvider.WaveFormat.AverageBytesPerSecond];
+                    int bytesRead;
+                    while ((bytesRead = waveProvider.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        writer.Write(buffer, 0, bytesRead);
+                    }
+                    writer.Flush();
+                }
+            }
+
+            var finalStream = new MemoryStream(streamResampled.ToArray());
+            finalStream.Position = 0;
+            return finalStream;
         }
 
         public void Dispose()
@@ -322,6 +363,98 @@ namespace Transcribe.PortAudio
             StopRecording();
             PortAudioNative.Pa_Terminate();
             disposed = true;
+        }
+
+        private PortAudioNative.PaError TryOpenStream(int device, int sampleRate, int channels, out IntPtr openedStream)
+        {
+            var inputParams = new PortAudioNative.PaStreamParameters
+            {
+                device = device,
+                channelCount = Math.Max(1, channels),
+                sampleFormat = PortAudioNative.PaSampleFormat.paInt16,
+                suggestedLatency = 0.1,
+                hostApiSpecificStreamInfo = IntPtr.Zero
+            };
+
+            return PortAudioNative.Pa_OpenStream(
+                out openedStream,
+                ref inputParams,
+                IntPtr.Zero,
+                sampleRate,
+                0,
+                PortAudioNative.PaStreamFlags.paClipOff,
+                IntPtr.Zero,
+                IntPtr.Zero);
+        }
+
+        private int ResolveFallbackChannels(PortAudioNative.PaDeviceInfo info)
+        {
+            if (info.maxInputChannels <= 0)
+            {
+                return targetChannels;
+            }
+
+            if (isLoopback)
+            {
+                return info.maxInputChannels >= 2 ? 2 : 1;
+            }
+
+            return 1;
+        }
+
+        private static ISampleProvider EnsureChannelCount(ISampleProvider source, int targetChannels)
+        {
+            if (source.WaveFormat.Channels == targetChannels)
+            {
+                return source;
+            }
+
+            if (targetChannels == 1)
+            {
+                return new ToMonoSampleProvider(source);
+            }
+
+            return source;
+        }
+
+        private sealed class ToMonoSampleProvider : ISampleProvider
+        {
+            private readonly ISampleProvider source;
+            private readonly int channels;
+            private float[] sourceBuffer = Array.Empty<float>();
+
+            public ToMonoSampleProvider(ISampleProvider source)
+            {
+                this.source = source;
+                channels = source.WaveFormat.Channels;
+                WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.WaveFormat.SampleRate, 1);
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int required = count * channels;
+                if (sourceBuffer.Length < required)
+                {
+                    sourceBuffer = new float[required];
+                }
+
+                int read = source.Read(sourceBuffer, 0, required);
+                int frames = read / channels;
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    float sum = 0f;
+                    int baseIndex = frame * channels;
+                    for (int ch = 0; ch < channels; ch++)
+                    {
+                        sum += sourceBuffer[baseIndex + ch];
+                    }
+                    buffer[offset + frame] = sum / channels;
+                }
+
+                return frames;
+            }
         }
     }
 }
