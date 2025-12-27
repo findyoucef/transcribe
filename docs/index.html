@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Transcribe | Local speech to text</title>
-    <meta name="description" content="Transcribe is a desktop app and CLI built on Whisper. Capture files, microphones, or system audio with optional diarization and summaries.">
+    <meta name="description" content="Transcribe (desktop + CLI) uses Whisper to capture audio from files, microphones, or system audio and produce live transcripts with diarization and timestamps. Summarization after capture is optional via Ollama with any Ollama model.">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body data-repo="youcefnb/transcribe" data-releases-repo="youcefnb/transcribe-releases">
@@ -18,7 +18,6 @@
         <a href="#features">Features</a>
         <a href="#modes">Modes</a>
         <a href="#downloads">Downloads</a>
-        <a href="#docs">Docs</a>
       </nav>
       <a class="button button--solid" href="#downloads">Download</a>
     </header>
@@ -29,8 +28,9 @@
           <p class="eyebrow">Local speech to text</p>
           <h1>Turn audio into clean transcripts with live modes and speaker diarization.</h1>
           <p class="lead">
-            Transcribe is a desktop app and CLI built on Whisper. Capture files, microphones,
-            or system audio, then export timestamped text. Summaries via Ollama are optional.
+            Transcribe (desktop + CLI) uses Whisper to capture audio from files, microphones, or
+            system audio and produce live transcripts with diarization and timestamps.
+            Summarization after capture is optional via Ollama with any Ollama model.
           </p>
           <div class="hero-cta">
             <a class="button button--solid" href="#downloads">Get the app</a>
@@ -54,7 +54,7 @@
         <div class="hero-panel">
           <div class="panel-card">
             <p class="panel-title">Real time capture</p>
-            <p class="panel-body">See live levels, speakers, and timestamps while recording. Export transcripts to text files automatically.</p>
+            <p class="panel-body">See speakers and timestamps while recording. Export transcripts to text files automatically.</p>
           </div>
           <div class="panel-card">
             <p class="panel-title">Offline friendly</p>
@@ -109,12 +109,12 @@
         <div class="grid mode-grid">
           <div class="mode-card">
             <p class="mode-title">File mode</p>
-            <p class="mode-body">Drop in WAV files and export transcripts with automatic timestamping.</p>
-            <span class="mode-tag">Batch friendly</span>
+            <p class="mode-body">Transcribe a WAV file and export a timestamped transcript.</p>
+            <span class="mode-tag">File based</span>
           </div>
           <div class="mode-card">
             <p class="mode-title">Mic mode</p>
-            <p class="mode-body">Live microphone capture with level meters and live output.</p>
+            <p class="mode-body">Live microphone capture with live output and timestamps.</p>
             <span class="mode-tag">Real time</span>
           </div>
           <div class="mode-card">
@@ -209,31 +209,10 @@
         </div>
       </section>
 
-      <section class="section docs" id="docs">
-        <div class="section-head">
-          <p class="section-kicker">Docs</p>
-          <h2>Everything else lives in the repo.</h2>
-        </div>
-        <div class="grid docs-grid">
-          <a class="doc-card" data-repo-link="readme" href="https://github.com/OWNER/REPO#readme">
-            <p class="doc-title">Read the full README</p>
-            <p class="doc-body">Commands, requirements, and platform specific notes.</p>
-          </a>
-          <a class="doc-card" data-repo-link="issues" href="https://github.com/OWNER/REPO/issues">
-            <p class="doc-title">Report an issue</p>
-            <p class="doc-body">Found a bug or need support. Open a GitHub issue.</p>
-          </a>
-          <a class="doc-card" data-repo-link="root" href="https://github.com/OWNER/REPO">
-            <p class="doc-title">Browse the source</p>
-            <p class="doc-body">Explore the CLI, GUI, and installer projects.</p>
-          </a>
-        </div>
-      </section>
     </main>
 
     <footer class="site-footer">
       <p>Transcribe is open source. Built for fast, private transcription.</p>
-      <a class="text-link" data-repo-link="root" href="https://github.com/OWNER/REPO">View on GitHub</a>
     </footer>
 
     <script src="app.js"></script>
