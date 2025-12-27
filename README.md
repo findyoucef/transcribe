@@ -2,6 +2,9 @@
 
 GUI and CLI transcription using Whisper. Supports batch WAV transcription, real-time mic capture, speaker/output capture, optional dual-source (speaker + mic) transcription, diarization and post-run summarization via Ollama. Live modes show speakers and write timestamped text.
 
+## Website (GitHub Pages)
+The project site lives in `docs/`. To publish, go to GitHub Settings -> Pages and set the source to `main` and folder `/docs`. Update `docs/index.html` `data-repo` with your GitHub `owner/repo` so download links resolve.
+
 ## Requirements
 - .NET 10 SDK
 - Live capture uses WASAPI on Windows and PortAudio on macOS/Linux (bundled)

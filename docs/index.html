@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Transcribe | Local speech to text</title>
+    <meta name="description" content="Transcribe is a desktop app and CLI built on Whisper. Capture files, microphones, or system audio with optional diarization and summaries.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body data-repo="youcefnb/transcribe">
+    <!-- Set data-repo to your GitHub owner/repo, e.g. baouchiy/transcribe -->
+    <div class="orb orb--one" aria-hidden="true"></div>
+    <div class="orb orb--two" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="logo" href="#top">Transcribe</a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#modes">Modes</a>
+        <a href="#downloads">Downloads</a>
+        <a href="#docs">Docs</a>
+      </nav>
+      <a class="button button--solid" href="#downloads">Download</a>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Local speech to text</p>
+          <h1>Turn audio into clean transcripts with live modes and speaker diarization.</h1>
+          <p class="lead">
+            Transcribe is a desktop app and CLI built on Whisper. Capture files, microphones,
+            or system audio, then export timestamped text. Summaries via Ollama are optional.
+          </p>
+          <div class="hero-cta">
+            <a class="button button--solid" href="#downloads">Get the app</a>
+            <a class="button button--ghost" data-release-url href="https://github.com/OWNER/REPO/releases/latest">Latest release</a>
+          </div>
+          <div class="hero-meta">
+            <div class="meta-card">
+              <span class="meta-label">Platforms</span>
+              <span class="meta-value">Windows, macOS, Linux</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Modes</span>
+              <span class="meta-value">File, Mic, Speaker</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Extras</span>
+              <span class="meta-value">Diarization, Summaries</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-panel">
+          <div class="panel-card">
+            <p class="panel-title">Real time capture</p>
+            <p class="panel-body">See live levels, speakers, and timestamps while recording. Export transcripts to text files automatically.</p>
+          </div>
+          <div class="panel-card">
+            <p class="panel-title">Offline friendly</p>
+            <p class="panel-body">Models download on first use and then run locally. Summaries are optional if you run Ollama.</p>
+          </div>
+          <div class="panel-card">
+            <p class="panel-title">Built for teams</p>
+            <p class="panel-body">Batch file runs, fast CLI workflows, and consistent output for review or archiving.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="section-head">
+          <p class="section-kicker">Why Transcribe</p>
+          <h2>Everything you need for dependable transcripts.</h2>
+          <p>Capture audio from multiple sources, tag speakers, and deliver export ready text in minutes.</p>
+        </div>
+        <div class="grid features">
+          <div class="card" style="--stagger: 1;">
+            <h3>Multi source capture</h3>
+            <p>Record files, microphones, or system output with optional dual source conversations.</p>
+          </div>
+          <div class="card" style="--stagger: 2;">
+            <h3>Speaker labeling</h3>
+            <p>Add diarization for clearer transcripts and easy handoff to editors or reviewers.</p>
+          </div>
+          <div class="card" style="--stagger: 3;">
+            <h3>Timestamped output</h3>
+            <p>Every segment includes time markers for quick navigation and review.</p>
+          </div>
+          <div class="card" style="--stagger: 4;">
+            <h3>Summaries on demand</h3>
+            <p>Pipe results into Ollama to generate summaries after transcription finishes.</p>
+          </div>
+          <div class="card" style="--stagger: 5;">
+            <h3>Cross platform GUI</h3>
+            <p>Avalonia based desktop app for Windows, macOS, and Linux.</p>
+          </div>
+          <div class="card" style="--stagger: 6;">
+            <h3>CLI automation</h3>
+            <p>Scriptable commands for batch runs, CI workflows, and power users.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section modes" id="modes">
+        <div class="section-head">
+          <p class="section-kicker">Modes</p>
+          <h2>Pick the capture style that fits your workflow.</h2>
+        </div>
+        <div class="grid mode-grid">
+          <div class="mode-card">
+            <p class="mode-title">File mode</p>
+            <p class="mode-body">Drop in WAV files and export transcripts with automatic timestamping.</p>
+            <span class="mode-tag">Batch friendly</span>
+          </div>
+          <div class="mode-card">
+            <p class="mode-title">Mic mode</p>
+            <p class="mode-body">Live microphone capture with level meters and live output.</p>
+            <span class="mode-tag">Real time</span>
+          </div>
+          <div class="mode-card">
+            <p class="mode-title">Speaker mode</p>
+            <p class="mode-body">Capture system audio plus optional microphone input for conversations.</p>
+            <span class="mode-tag">Dual source</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section downloads" id="downloads">
+        <div class="section-head">
+          <p class="section-kicker">Downloads</p>
+          <h2>Grab the desktop app or CLI.</h2>
+          <p>Latest builds are published as GitHub releases. Packages are self contained and ready to run.</p>
+          <p class="release-status" data-release-status>Latest release: open on GitHub.</p>
+        </div>
+
+        <div class="download-grid">
+          <div class="download-group">
+            <div class="download-head">
+              <h3>Desktop GUI</h3>
+              <p>Full interface for file and live capture.</p>
+            </div>
+            <div class="download-cards">
+              <a class="download-card" data-asset="gui-win" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">Windows x64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+              <a class="download-card" data-asset="gui-mac" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">macOS arm64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+              <a class="download-card" data-asset="gui-linux" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">Linux x64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="download-group">
+            <div class="download-head">
+              <h3>CLI</h3>
+              <p>Scriptable commands for automation and pipelines.</p>
+            </div>
+            <div class="download-cards">
+              <a class="download-card" data-asset="cli-win" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">Windows x64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+              <a class="download-card" data-asset="cli-mac" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">macOS arm64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+              <a class="download-card" data-asset="cli-linux" data-release-url href="https://github.com/OWNER/REPO/releases/latest">
+                <span class="download-title">Linux x64</span>
+                <span class="download-meta" data-version>latest</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="download-footer">
+          <a class="text-link" data-release-url href="https://github.com/OWNER/REPO/releases/latest">See all releases</a>
+        </div>
+      </section>
+
+      <section class="section workflow">
+        <div class="section-head">
+          <p class="section-kicker">Workflow</p>
+          <h2>From capture to transcript in three steps.</h2>
+        </div>
+        <div class="workflow-steps">
+          <div class="step-card">
+            <span class="step-number">1</span>
+            <h3>Choose a mode</h3>
+            <p>Pick file, microphone, or speaker capture and select your audio device.</p>
+          </div>
+          <div class="step-card">
+            <span class="step-number">2</span>
+            <h3>Transcribe locally</h3>
+            <p>Whisper runs locally after the first model download.</p>
+          </div>
+          <div class="step-card">
+            <span class="step-number">3</span>
+            <h3>Export or summarize</h3>
+            <p>Save timestamped text and optionally generate a summary via Ollama.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <p><strong>System audio tips:</strong> macOS may require a loopback driver like BlackHole. Linux uses monitor sources in PulseAudio or PipeWire.</p>
+        </div>
+      </section>
+
+      <section class="section docs" id="docs">
+        <div class="section-head">
+          <p class="section-kicker">Docs</p>
+          <h2>Everything else lives in the repo.</h2>
+        </div>
+        <div class="grid docs-grid">
+          <a class="doc-card" data-repo-link="readme" href="https://github.com/OWNER/REPO#readme">
+            <p class="doc-title">Read the full README</p>
+            <p class="doc-body">Commands, requirements, and platform specific notes.</p>
+          </a>
+          <a class="doc-card" data-repo-link="issues" href="https://github.com/OWNER/REPO/issues">
+            <p class="doc-title">Report an issue</p>
+            <p class="doc-body">Found a bug or need support. Open a GitHub issue.</p>
+          </a>
+          <a class="doc-card" data-repo-link="root" href="https://github.com/OWNER/REPO">
+            <p class="doc-title">Browse the source</p>
+            <p class="doc-body">Explore the CLI, GUI, and installer projects.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Transcribe is open source. Built for fast, private transcription.</p>
+      <a class="text-link" data-repo-link="root" href="https://github.com/OWNER/REPO">View on GitHub</a>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
