@@ -1,23 +1,28 @@
 (() => {
   const body = document.body;
-  const repo = resolveRepo(body.dataset.repo) || deriveRepoFromLocation();
+  const sourceRepo = resolveRepo(body.dataset.repo) || deriveRepoFromLocation();
+  const releasesRepo = resolveRepo(body.dataset.releasesRepo) || sourceRepo;
+  const docsRepo = sourceRepo || releasesRepo;
   const releaseLinks = document.querySelectorAll("[data-release-url]");
   const repoLinks = document.querySelectorAll("[data-repo-link]");
   const status = document.querySelector("[data-release-status]");
 
-  if (repo) {
-    const releaseUrl = `https://github.com/${repo}/releases/latest`;
+  if (releasesRepo) {
+    const releaseUrl = `https://github.com/${releasesRepo}/releases/latest`;
     releaseLinks.forEach((link) => {
       link.href = releaseUrl;
     });
-    repoLinks.forEach((link) => {
-      link.href = buildRepoLink(repo, link.dataset.repoLink);
-    });
   } else if (status) {
-    status.textContent = "Set data-repo in index.html to enable automatic downloads.";
+    status.textContent = "Set data-releases-repo in index.html to enable downloads.";
   }
 
-  if (!repo) {
+  if (docsRepo) {
+    repoLinks.forEach((link) => {
+      link.href = buildRepoLink(docsRepo, link.dataset.repoLink);
+    });
+  }
+
+  if (!releasesRepo) {
     return;
   }
 
@@ -25,7 +30,7 @@
     status.textContent = "Checking latest release...";
   }
 
-  fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+  fetch(`https://api.github.com/repos/${releasesRepo}/releases/latest`, {
     headers: { Accept: "application/vnd.github+json" },
   })
     .then((response) => {
