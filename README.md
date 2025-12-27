@@ -12,8 +12,9 @@ If your source repo is private but downloads are public, set:
 ## Public releases repo
 The build workflow can publish release assets to a public repo (default `youcefnb/transcribe-releases`).
 1) Create the public releases repo.
-2) Add a secret `RELEASES_REPO_TOKEN` in this repo with a PAT that can write releases to the public repo.
-3) Update `RELEASES_REPO` in `.github/workflows/build_and_publish.yml` if your public repo name is different.
+2) Ensure it has at least one commit and a default branch (the workflow assumes `main` unless you change `RELEASES_REPO_DEFAULT_BRANCH`).
+3) Add a secret `RELEASES_REPO_TOKEN` in this repo with a PAT that can write releases to the public repo.
+4) Update `RELEASES_REPO` in `.github/workflows/build_and_publish.yml` if your public repo name is different.
 
 ## Requirements
 - .NET 10 SDK

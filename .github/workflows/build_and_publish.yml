@@ -12,6 +12,7 @@ permissions:
 
 env:
   RELEASES_REPO: youcefnb/transcribe-releases
+  RELEASES_REPO_DEFAULT_BRANCH: main
 
 jobs:
   version-control:
@@ -28,6 +29,7 @@ jobs:
           TAG_NAME: ${{ github.event.inputs.version }}
           RELEASE_NAME: transcribe-${{ github.event.inputs.version }}
           RELEASES_REPO: ${{ env.RELEASES_REPO }}
+          TARGET_COMMITISH: ${{ env.RELEASES_REPO_DEFAULT_BRANCH }}
           RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
         run: |
           set -euo pipefail
@@ -38,12 +40,15 @@ jobs:
           if [[ -z "${RELEASES_REPO:-}" ]]; then
             echo "RELEASES_REPO is required"; exit 1
           fi
+          if [[ -z "${TARGET_COMMITISH:-}" ]]; then
+            echo "RELEASES_REPO_DEFAULT_BRANCH is required"; exit 1
+          fi
           if [[ -z "${RELEASES_TOKEN:-}" ]]; then
             echo "Missing RELEASES_REPO_TOKEN secret"; exit 1
           fi
 
-          payload=$(jq -n --arg tag "$TAG_NAME" --arg name "$RELEASE_NAME" \
-            '{ tag_name: $tag, name: $name, prerelease: false }')
+          payload=$(jq -n --arg tag "$TAG_NAME" --arg name "$RELEASE_NAME" --arg target "$TARGET_COMMITISH" \
+            '{ tag_name: $tag, name: $name, target_commitish: $target, prerelease: false }')
 
           resp_file=$(mktemp)
           status=$(curl -sS -X POST \
@@ -56,6 +61,11 @@ jobs:
 
           # If the release for this tag already exists, fetch it instead
           if [[ "$status" == "422" ]]; then
+            if ! jq -e '.errors[]? | select(.code=="already_exists" and .field=="tag_name")' "$resp_file" > /dev/null; then
+              echo "Release creation failed:"
+              cat "$resp_file"
+              exit 1
+            fi
             rm -f "$resp_file"
             resp_file=$(mktemp)
             status=$(curl -sS -X GET \
