@@ -3,18 +3,7 @@
 GUI and CLI transcription using Whisper. Supports batch WAV transcription, real-time mic capture, speaker/output capture, optional dual-source (speaker + mic) transcription, diarization and post-run summarization via Ollama. Live modes show speakers and write timestamped text.
 
 ## Website (GitHub Pages)
-The project site lives in `docs/`. To publish, go to GitHub Settings -> Pages and set the source to `main` and folder `/docs`.
-
-If your source repo is private but downloads are public, set:
-- `data-repo` in `docs/index.html` to your source repo if you want the Docs links to resolve.
-- `data-releases-repo` in `docs/index.html` to your public releases repo (used for download links).
-
-## Public releases repo
-The build workflow can publish release assets to a public repo (default `youcefnb/transcribe-releases`).
-1) Create the public releases repo.
-2) Ensure it has at least one commit and a default branch (the workflow assumes `main` unless you change `RELEASES_REPO_DEFAULT_BRANCH`).
-3) Add a secret `RELEASES_REPO_TOKEN` in this repo with a PAT that can write releases to the public repo.
-4) Update `RELEASES_REPO` in `.github/workflows/build_and_publish.yml` if your public repo name is different.
+The project site lives in `docs/`. To publish, go to GitHub Settings -> Pages and set the source to `main` and folder `/docs`. Update `docs/index.html` `data-repo` with your GitHub `owner/repo` so download links resolve.
 
 ## Requirements
 - .NET 10 SDK
