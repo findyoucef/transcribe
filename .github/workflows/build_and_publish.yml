@@ -10,10 +10,6 @@ on:
 permissions:
   contents: write
 
-env:
-  RELEASES_REPO: youcefnb/transcribe-releases
-  RELEASES_REPO_DEFAULT_BRANCH: main
-
 jobs:
   version-control:
     runs-on: ubuntu-latest
@@ -28,51 +24,36 @@ jobs:
         env:
           TAG_NAME: ${{ github.event.inputs.version }}
           RELEASE_NAME: transcribe-${{ github.event.inputs.version }}
-          RELEASES_REPO: ${{ env.RELEASES_REPO }}
-          TARGET_COMMITISH: ${{ env.RELEASES_REPO_DEFAULT_BRANCH }}
-          RELEASES_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+          REPO_FULL_NAME: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
           if [[ -z "${TAG_NAME:-}" ]]; then
             echo "Input 'version' is required"; exit 1
           fi
-          if [[ -z "${RELEASES_REPO:-}" ]]; then
-            echo "RELEASES_REPO is required"; exit 1
-          fi
-          if [[ -z "${TARGET_COMMITISH:-}" ]]; then
-            echo "RELEASES_REPO_DEFAULT_BRANCH is required"; exit 1
-          fi
-          if [[ -z "${RELEASES_TOKEN:-}" ]]; then
-            echo "Missing RELEASES_REPO_TOKEN secret"; exit 1
-          fi
 
-          payload=$(jq -n --arg tag "$TAG_NAME" --arg name "$RELEASE_NAME" --arg target "$TARGET_COMMITISH" \
-            '{ tag_name: $tag, name: $name, target_commitish: $target, prerelease: false }')
+          payload=$(jq -n --arg tag "$TAG_NAME" --arg name "$RELEASE_NAME" \
+            '{ tag_name: $tag, name: $name, prerelease: false }')
 
           resp_file=$(mktemp)
           status=$(curl -sS -X POST \
-            -H "Authorization: Bearer ${RELEASES_TOKEN}" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             -o "$resp_file" -w "%{http_code}" \
-            "https://api.github.com/repos/${RELEASES_REPO}/releases" \
+            "https://api.github.com/repos/${REPO_FULL_NAME}/releases" \
             -d "$payload" || true)
 
           # If the release for this tag already exists, fetch it instead
           if [[ "$status" == "422" ]]; then
-            if ! jq -e '.errors[]? | select(.code=="already_exists" and .field=="tag_name")' "$resp_file" > /dev/null; then
-              echo "Release creation failed:"
-              cat "$resp_file"
-              exit 1
-            fi
             rm -f "$resp_file"
             resp_file=$(mktemp)
             status=$(curl -sS -X GET \
-              -H "Authorization: Bearer ${RELEASES_TOKEN}" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -o "$resp_file" -w "%{http_code}" \
-              "https://api.github.com/repos/${RELEASES_REPO}/releases/tags/${TAG_NAME}" || true)
+              "https://api.github.com/repos/${REPO_FULL_NAME}/releases/tags/${TAG_NAME}" || true)
           fi
 
           if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
@@ -146,8 +127,9 @@ jobs:
     - name: Upload a Release Asset
       id: upload-release-asset
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-${{env.CLI_RELEASE}}-winx64.zip
         asset_name: transcribe-${{env.CLI_RELEASE}}-winx64.zip
@@ -166,8 +148,9 @@ jobs:
     - name: Upload CLI Release Asset
       id: upload-release-asset-cli
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-cli-${{env.CLI_RELEASE}}-winx64.zip
         asset_name: transcribe-cli-${{env.CLI_RELEASE}}-winx64.zip
@@ -225,8 +208,9 @@ jobs:
     - name: Upload a Release Asset
       id: upload-release-asset
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-${{env.CLI_RELEASE}}-linux-x64.zip
         asset_name: transcribe-${{env.CLI_RELEASE}}-linux-x64.zip
@@ -245,8 +229,9 @@ jobs:
     - name: Upload CLI Release Asset
       id: upload-release-asset-cli
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-cli-${{env.CLI_RELEASE}}-linux-x64.zip
         asset_name: transcribe-cli-${{env.CLI_RELEASE}}-linux-x64.zip
@@ -305,8 +290,9 @@ jobs:
     - name: Upload a Release Asset
       id: upload-release-asset
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip
         asset_name: transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip
@@ -325,8 +311,9 @@ jobs:
     - name: Upload CLI Release Asset
       id: upload-release-asset-cli
       uses: shogo82148/actions-upload-release-asset@v1.7.2
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     
       with:
-        github_token: ${{ secrets.RELEASES_REPO_TOKEN }}
         upload_url: ${{env.CLI_RELEASE_URL}}
         asset_path: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip 
         asset_name: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip 
