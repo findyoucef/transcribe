@@ -41,6 +41,22 @@ public sealed class MainViewModel : ObservableObject
 
     public bool IsWindows => OperatingSystem.IsWindows();
     public bool IsMacOS => OperatingSystem.IsMacOS();
+    public bool NeedsBlackHole => IsMacOS && !OperatingSystem.IsMacOSVersionAtLeast(14, 2);
+    public bool EchoCancellationAvailable => OperatingSystem.IsMacOSVersionAtLeast(14, 2);
+    private bool echoCancellation;
+    public bool EchoCancellation
+    {
+        get => echoCancellation;
+        set
+        {
+            if (SetProperty(ref echoCancellation, value)) RaiseCanStartChanged();
+        }
+    }
+    public string SystemAudioHelp => OperatingSystem.IsMacOSVersionAtLeast(14, 2)
+        ? "Captures system audio directly. Allow system audio recording when macOS asks. Your speakers and headphones keep playing normally."
+        : IsMacOS ? "macOS before 14.2: select a BlackHole loopback input and configure a Multi-Output Device."
+        : IsWindows ? "Captures audio playing through the selected output device."
+        : "Select a monitor input for your output device (PulseAudio/PipeWire).";
 
     private string wavFilePath = "";
     public string WavFilePath
@@ -100,11 +116,15 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref selectedMicDevice, value))
             {
                 RaisePropertyChanged(nameof(DeviceSummaryTooltip));
+                RaiseCanStartChanged();
             }
         }
     }
 
-    private string outputFolder = "";
+    private static string DefaultOutputFolder => OperatingSystem.IsMacOS()
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Transcribe")
+        : "";
+    private string outputFolder = DefaultOutputFolder;
     public string OutputFolder
     {
         get => outputFolder;
@@ -793,7 +813,8 @@ public sealed class MainViewModel : ObservableObject
         SummarizeWithOllama = false;
         OllamaUrl = TranscribeDefaults.DefaultOllamaUrl;
         OllamaModel = TranscribeDefaults.DefaultOllamaModel;
-        OutputFolder = "";
+        OutputFolder = DefaultOutputFolder;
+        EchoCancellation = false;
         ConnectionStatusText = "Not tested";
         IsOllamaConnected = null;
         FileProgressPercent = 0;
@@ -1010,6 +1031,12 @@ public sealed class MainViewModel : ObservableObject
             return false;
         }
 
+        if (SelectedModeIndex == 2 && EchoCancellation && (SelectedMicDevice?.Index ?? -1) < 0)
+        {
+            reason = "Select a microphone to use echo cancellation.";
+            return false;
+        }
+
         if (!IsOutputFolderValid)
         {
             reason = "Output folder is invalid or not writable.";
@@ -1042,7 +1069,9 @@ public sealed class MainViewModel : ObservableObject
         var name = $"{Guid.NewGuid():N}.txt";
         if (string.IsNullOrWhiteSpace(OutputFolder))
         {
-            return name;
+            if (!OperatingSystem.IsMacOS()) return name;
+            Directory.CreateDirectory(DefaultOutputFolder);
+            return Path.Combine(DefaultOutputFolder, name);
         }
 
         Directory.CreateDirectory(OutputFolder);
@@ -1298,10 +1327,11 @@ public sealed class MainViewModel : ObservableObject
                 onStatus: LogInfo,
                 emitConsoleOutput: false,
                 diarization: speakerDiarization);
+            speakerDiarization = null; // The processor now owns this pipeline.
 
             if (micIndex >= 0)
             {
-                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
+                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex, echoCancellation: EchoCancellation);
                 if (diarizationResources != null)
                 {
                     var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
@@ -1321,19 +1351,17 @@ public sealed class MainViewModel : ObservableObject
                     onStatus: LogInfo,
                     emitConsoleOutput: false,
                     diarization: micDiarization);
+                micDiarization = null;
             }
 
+            // Voice processing may configure the output device; start it before the tap.
+            micRecorder?.StartRecording();
             speakerRecorder.StartRecording();
             speakerProcessor.StartProcessing();
+            micProcessor?.StartProcessing();
+            if (micRecorder != null && EchoCancellation)
+                LogInfo("Microphone echo cancellation enabled (Apple voice processing). Playback ducking is set to minimum.");
 
-            if (micRecorder != null && micProcessor != null)
-            {
-                micRecorder.StartRecording();
-                micProcessor.StartProcessing();
-            }
-
-            speakerDiarization = null;
-            micDiarization = null;
         }
         finally
         {

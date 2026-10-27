@@ -32,6 +32,10 @@ namespace transcribe.tests
             {
                 recorder.GetType().Name.Should().Be("SpeakerRecorder");
             }
+            else if (OperatingSystem.IsMacOSVersionAtLeast(14, 2))
+            {
+                recorder.GetType().Name.Should().Be("MacAudioRecorder");
+            }
             else
             {
                 recorder.GetType().Name.Should().Be("PortAudioRecorder");

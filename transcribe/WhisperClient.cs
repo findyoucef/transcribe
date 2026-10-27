@@ -32,9 +32,10 @@ namespace Transcribe
                     break;
             }
 
-            // Resolve model path to the program's binary directory
-            var baseDir = AppContext.BaseDirectory;
-            var modelPath = Path.Combine(baseDir, modelFileName);
+            // Reuse bundled/legacy models, but never download into a signed Mac app.
+            var modelPath = Path.Combine(AppContext.BaseDirectory, modelFileName);
+            if (OperatingSystem.IsMacOS() && !File.Exists(modelPath))
+                modelPath = Path.Combine(TranscribeDefaults.MacModelCacheDirectory, modelFileName);
 
             // Download model if missing
             if (!File.Exists(modelPath))

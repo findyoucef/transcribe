@@ -30,6 +30,10 @@ namespace Transcribe
         public const float DefaultDiarizationInstantSwitchSimilarity = 0.82f;
         public const int DefaultLiveDiarizationDelaySeconds = 50;
 
+        public static string MacModelCacheDirectory => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Library", "Application Support", "Transcribe", "models");
+
         public static readonly IReadOnlyList<string> SupportedModels = new[]
         {
             "TinyEn",

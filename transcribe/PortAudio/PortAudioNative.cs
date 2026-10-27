@@ -26,6 +26,9 @@ namespace Transcribe.PortAudio
         public static extern IntPtr Pa_GetDeviceInfo(int deviceIndex);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint PaMacCore_GetStreamInputDevice(IntPtr stream);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern PaError Pa_OpenStream(
             out IntPtr stream,
             ref PaStreamParameters inputParameters,
@@ -144,7 +147,18 @@ namespace Transcribe.PortAudio
                 return IntPtr.Zero;
             }
 
-            if (NativeLibrary.TryLoad("libportaudio.2.dylib", assembly, searchPath, out var handle))
+            // Content under runtimes/ is not automatically probed by a single-file
+            // app. Prefer the shipped library to any machine-wide installation.
+            var platform = OperatingSystem.IsMacOS() ? "osx" : "linux";
+            var architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+            var bundledPath = Path.Combine(AppContext.BaseDirectory, "runtimes", $"{platform}-{architecture}",
+                "native", OperatingSystem.IsMacOS() ? "libportaudio.dylib" : "libportaudio.so");
+            if (NativeLibrary.TryLoad(bundledPath, out var handle))
+            {
+                return handle;
+            }
+
+            if (NativeLibrary.TryLoad("libportaudio.2.dylib", assembly, searchPath, out handle))
             {
                 return handle;
             }

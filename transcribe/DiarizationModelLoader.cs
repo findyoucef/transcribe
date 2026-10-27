@@ -9,7 +9,10 @@ namespace Transcribe
     {
         public static string GetDefaultModelPath()
         {
-            return Path.Combine(AppContext.BaseDirectory, "models", TranscribeDefaults.DefaultDiarizationModelFileName);
+            var bundledPath = Path.Combine(AppContext.BaseDirectory, "models", TranscribeDefaults.DefaultDiarizationModelFileName);
+            return OperatingSystem.IsMacOS() && !File.Exists(bundledPath)
+                ? Path.Combine(TranscribeDefaults.MacModelCacheDirectory, TranscribeDefaults.DefaultDiarizationModelFileName)
+                : bundledPath;
         }
 
         public static string GetDefaultConfigPath()

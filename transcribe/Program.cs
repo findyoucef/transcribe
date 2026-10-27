@@ -590,6 +590,10 @@ namespace Transcribe
                 description: "Microphone device number to capture your voice (use 'list-devices' to see available devices). Set to -1 to disable mic (default).",
                 getDefaultValue: () => -1);
 
+            var echoCancellationOption = new Option<bool>(
+                name: "--echo-cancellation",
+                description: "Reduce speaker echo in the selected microphone using Apple voice processing (macOS 14.2+, requires --mic-device). May lower playback volume.");
+
             var summarizeOption = new Option<bool>(
                 name: "--summarize",
                 description: $"Summarize the final transcript with Ollama ({TranscribeDefaults.DefaultOllamaUrl}, model {TranscribeDefaults.DefaultOllamaModel}).",
@@ -607,6 +611,7 @@ namespace Transcribe
                 chunkSizeOption,
                 deviceOption,
                 micDeviceOption,
+                echoCancellationOption,
                 summarizeOption,
                 outputDirOption
             };
@@ -620,6 +625,7 @@ namespace Transcribe
                 var chunkSize = context.ParseResult.GetValueForOption(chunkSizeOption);
                 var device = context.ParseResult.GetValueForOption(deviceOption);
                 var micDevice = context.ParseResult.GetValueForOption(micDeviceOption);
+                var echoCancellation = context.ParseResult.GetValueForOption(echoCancellationOption);
                 var summarize = context.ParseResult.GetValueForOption(summarizeOption);
                 var outputDir = context.ParseResult.GetValueForOption(outputDirOption);
                 var diarize = context.ParseResult.GetValueForOption(diarizationOptions.Enable);
@@ -644,6 +650,11 @@ namespace Transcribe
 
                 try
                 {
+                    if (echoCancellation && micDevice < 0)
+                        throw new ArgumentException("--echo-cancellation requires --mic-device.");
+                    if (echoCancellation && !OperatingSystem.IsMacOSVersionAtLeast(14, 2))
+                        throw new PlatformNotSupportedException("Echo cancellation currently requires macOS 14.2 or later.");
+
                     var diarizationOptions = BuildDiarizationOptions(
                         diarize,
                         diarizationModel,
@@ -712,13 +723,15 @@ namespace Transcribe
                             transcriptFilePath: sharedTranscript,
                             merger: merger,
                             diarization: speakerDiarization);
+                        speakerDiarization = null; // The processor now owns this pipeline.
 
                         // Optional mic
-                        IAudioRecorder? micRecorder = null;
+                        using var micRecorder = micDevice >= 0
+                            ? AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micDevice, echoCancellation: echoCancellation)
+                            : null;
                         WhisperStreamProcessor? micProcessor = null;
-                        if (micDevice >= 0)
+                        if (micRecorder != null)
                         {
-                            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micDevice);
                             if (diarizationResources != null)
                             {
                                 var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
@@ -735,37 +748,41 @@ namespace Transcribe
                                 transcriptFilePath: sharedTranscript,
                                 merger: merger,
                                 diarization: micDiarization);
+                            micDiarization = null;
                         }
 
-                        // Start speaker
-                        speakerRecorder.StartRecording();
-                        speakerProcessor.StartProcessing();
-                        // Start mic if enabled
-                        if (micRecorder != null && micProcessor != null)
+                        // Start voice processing before the system tap, because it may
+                        // configure the output device used as the echo reference.
+                        try
                         {
-                            micRecorder.StartRecording();
-                            micProcessor.StartProcessing();
+                            micRecorder?.StartRecording();
+                            speakerRecorder.StartRecording();
+                            speakerProcessor.StartProcessing();
+                            micProcessor?.StartProcessing();
+                            if (echoCancellation)
+                                Console.WriteLine("Microphone echo cancellation enabled (Apple voice processing; minimum playback ducking).");
+
+                            var tcs = new TaskCompletionSource<bool>();
+                            ConsoleCancelEventHandler cancel = (s, e) =>
+                            {
+                                e.Cancel = true;
+                                tcs.TrySetResult(true);
+                            };
+                            Console.CancelKeyPress += cancel;
+                            try { await tcs.Task; }
+                            finally { Console.CancelKeyPress -= cancel; }
                         }
-
-                        // Wait for Ctrl+C
-                        var tcs = new TaskCompletionSource<bool>();
-                        Console.CancelKeyPress += (s, e) =>
+                        finally
                         {
-                            e.Cancel = true;
-                            tcs.TrySetResult(true);
-                        };
-
-                        await tcs.Task;
-
-                        Console.WriteLine();
-                        Console.WriteLine("Stopping transcription...");
-                    
-                        speakerRecorder.StopRecording();
-                        await speakerProcessor.StopProcessing();
-                        if (micRecorder != null && micProcessor != null)
-                        {
-                            micRecorder.StopRecording();
-                            await micProcessor.StopProcessing();
+                            Console.WriteLine("Stopping transcription...");
+                            speakerRecorder.StopRecording();
+                            micRecorder?.StopRecording();
+                            await speakerProcessor.StopProcessing();
+                            if (micProcessor != null)
+                            {
+                                await micProcessor.StopProcessing();
+                                micProcessor.Dispose();
+                            }
                         }
                         // Ensure merger closes its writer before reading the transcript
                         merger.Dispose();
@@ -786,8 +803,6 @@ namespace Transcribe
 
                         Console.WriteLine("Transcription stopped.");
 
-                        speakerDiarization = null;
-                        micDiarization = null;
                     }
                     finally
                     {
@@ -797,6 +812,7 @@ namespace Transcribe
                 }
                 catch (Exception ex)
                 {
+                    context.ExitCode = 1;
                     Console.Error.WriteLine($"Error: {ex.Message}");
                     Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
                 }

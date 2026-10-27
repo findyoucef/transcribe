@@ -40,6 +40,45 @@ namespace Transcribe.PortAudio
 
         public bool IsMicrophone => !isLoopback;
 
+        internal static uint GetMacInputDeviceId(int deviceIndex)
+        {
+            // PortAudio owns the public device indices. Opening a stream without
+            // starting it lets its Core Audio extension resolve the exact hardware ID,
+            // avoiding ambiguous name matching or a second device-numbering scheme.
+            var error = PortAudioNative.Pa_Initialize();
+            if (error != PortAudioNative.PaError.paNoError)
+                throw new InvalidOperationException($"PortAudio initialization failed: {error}");
+            IntPtr mappingStream = IntPtr.Zero;
+            try
+            {
+                var infoPointer = PortAudioNative.Pa_GetDeviceInfo(deviceIndex);
+                if (infoPointer == IntPtr.Zero)
+                    throw new ArgumentOutOfRangeException(nameof(deviceIndex), "Microphone not found. Refresh the device list.");
+                var info = Marshal.PtrToStructure<PortAudioNative.PaDeviceInfo>(infoPointer);
+                if (info.maxInputChannels <= 0)
+                    throw new ArgumentException("The selected device has no microphone input.", nameof(deviceIndex));
+                var input = new PortAudioNative.PaStreamParameters
+                {
+                    device = deviceIndex,
+                    channelCount = Math.Min(2, info.maxInputChannels),
+                    sampleFormat = PortAudioNative.PaSampleFormat.paFloat32,
+                    suggestedLatency = info.defaultLowInputLatency
+                };
+                error = PortAudioNative.Pa_OpenStream(out mappingStream, ref input, IntPtr.Zero,
+                    info.defaultSampleRate, 0, PortAudioNative.PaStreamFlags.paNoFlag, IntPtr.Zero, IntPtr.Zero);
+                if (error != PortAudioNative.PaError.paNoError)
+                    throw new InvalidOperationException($"Could not open the selected microphone: {error}. Check Microphone permission in System Settings > Privacy & Security.");
+                var device = PortAudioNative.PaMacCore_GetStreamInputDevice(mappingStream);
+                if (device == 0) throw new InvalidOperationException("Could not resolve the selected Core Audio microphone.");
+                return device;
+            }
+            finally
+            {
+                if (mappingStream != IntPtr.Zero) PortAudioNative.Pa_CloseStream(mappingStream);
+                PortAudioNative.Pa_Terminate();
+            }
+        }
+
         public static IEnumerable<AudioDeviceInfo> GetDevices(bool input = true)
         {
             var list = new List<AudioDeviceInfo>();

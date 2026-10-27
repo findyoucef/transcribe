@@ -42,4 +42,17 @@
     <RuntimeHostConfigurationOption Include="System.Runtime.InteropServices.BuiltInComInterop.IsSupported" Value="true" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <BuildMacAudio Condition="$([MSBuild]::IsOSPlatform('OSX')) and ('$(RuntimeIdentifier)' == '' or $(RuntimeIdentifier.StartsWith('osx-')))">true</BuildMacAudio>
+    <MacAudioLibrary>$(MSBuildProjectDirectory)/$(BaseIntermediateOutputPath)native/$(Configuration)/$(RuntimeIdentifier)/libtranscribe_audio.dylib</MacAudioLibrary>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(BuildMacAudio)' == 'true'">
+    <None Include="$(MacAudioLibrary)" Link="libtranscribe_audio.dylib" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+  <Target Name="BuildMacSystemAudio" BeforeTargets="PrepareForBuild" Condition="'$(BuildMacAudio)' == 'true'"
+          Inputs="$(MSBuildProjectDirectory)/MacAudio/SystemAudioCapture.m" Outputs="$(MacAudioLibrary)">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(MacAudioLibrary)'))" />
+    <Exec Command="xcrun clang -dynamiclib -fobjc-arc -O2 -Wall -Wextra -Wno-unused-parameter -arch arm64 -arch x86_64 -mmacosx-version-min=14.2 -framework Foundation -framework CoreAudio -framework AudioToolbox -install_name @rpath/libtranscribe_audio.dylib &quot;$(MSBuildProjectDirectory)/MacAudio/SystemAudioCapture.m&quot; -o &quot;$(MacAudioLibrary)&quot;" />
+  </Target>
+
 </Project>

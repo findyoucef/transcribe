@@ -2,15 +2,21 @@ namespace Transcribe
 {
     public static class AudioCaptureFactory
     {
-        public static IAudioRecorder CreateMicrophoneRecorder(int deviceIndex = 0, int sampleRate = 16000, int channels = 1)
+        public static IAudioRecorder CreateMicrophoneRecorder(int deviceIndex = 0, int sampleRate = 16000, int channels = 1, bool echoCancellation = false)
         {
+            if (echoCancellation)
+            {
+                if (!OperatingSystem.IsMacOSVersionAtLeast(14, 2))
+                    throw new PlatformNotSupportedException("Echo cancellation currently requires macOS 14.2 or later.");
+                if (sampleRate != 16000 || channels != 1)
+                    throw new ArgumentException("Echo-cancelled transcription requires 16 kHz mono output.");
+                return new MacAudio.MacAudioRecorder(deviceIndex);
+            }
             if (OperatingSystem.IsWindows())
             {
                 return new MicrophoneRecorder(sampleRate, channels, deviceIndex);
             }
             
-            // Fallback to PortAudio for non-Windows platforms (or if forced)
-            // Note: PortAudioRecorder implementation to follow
             return new PortAudio.PortAudioRecorder(deviceIndex, sampleRate, channels);
         }
 
@@ -21,8 +27,14 @@ namespace Transcribe
                 return new SpeakerRecorder(deviceIndex);
             }
 
-            // On macOS/Linux, "speaker" capture often means capturing a loopback/monitor device
-            // We'll use PortAudio to find such devices.
+            if (OperatingSystem.IsMacOSVersionAtLeast(14, 2))
+            {
+                if (deviceIndex != 0)
+                    throw new ArgumentOutOfRangeException(nameof(deviceIndex), "Native macOS capture uses device 0 (System Audio). Use list-speakers to see available devices.");
+                return new MacAudio.MacAudioRecorder();
+            }
+
+            // Older Macs and Linux use a loopback/monitor input.
             return new PortAudio.PortAudioRecorder(deviceIndex, 16000, 1, isLoopback: true);
         }
 
@@ -40,6 +52,10 @@ namespace Transcribe
             if (OperatingSystem.IsWindows())
             {
                 return SpeakerRecorder.GetSpeakers();
+            }
+            if (OperatingSystem.IsMacOSVersionAtLeast(14, 2))
+            {
+                return new[] { new AudioDeviceInfo(0, "System Audio (Native)", 1) };
             }
             return PortAudio.PortAudioRecorder.GetDevices(input: false);
         }

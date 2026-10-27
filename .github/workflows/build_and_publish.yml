@@ -279,13 +279,15 @@ jobs:
        
     - name: Build GUI
       run: dotnet publish transcribe.gui --configuration Release --self-contained true --runtime osx-arm64 /p:PublishSingleFile=true /p:PublishTrimmed=false /p:Version=${{env.CLI_RELEASE}} -o ./published/osx-arm64
+
+    - name: Test native macOS audio buffer
+      run: bash scripts/test-macos-audio.sh
+
+    - name: Package macOS GUI
+      run: bash scripts/package-macos.sh ./published/osx-arm64 txgui './bundles/gui/Transcribe.app' '${{env.CLI_RELEASE}}'
             
     - name: Zip Artifact
-      uses: vimtor/action-zip@v1.1
-      with:
-        files: ./published/osx-arm64/
-        recursive: true
-        dest: transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip          
+      run: ditto -c -k --sequesterRsrc ./bundles/gui 'transcribe-${{env.CLI_RELEASE}}-osx-arm64.zip'
     
     - name: Upload a Release Asset
       id: upload-release-asset
@@ -301,12 +303,17 @@ jobs:
     - name: Build and publish CLI
       run: dotnet publish transcribe --configuration Release --self-contained true --runtime osx-arm64 /p:PublishSingleFile=true /p:PublishTrimmed=false /p:Version=${{env.CLI_RELEASE}} -o ./published/osx-arm64-cli
 
+    - name: Package macOS CLI
+      run: |
+        bash scripts/package-macos.sh ./published/osx-arm64-cli tx './bundles/cli/Transcribe CLI.app' '${{env.CLI_RELEASE}}'
+        cat > ./bundles/cli/tx <<'EOF'
+        #!/bin/sh
+        exec "$(dirname "$0")/Transcribe CLI.app/Contents/MacOS/tx" "$@"
+        EOF
+        chmod +x ./bundles/cli/tx
+
     - name: Zip Artifact CLI
-      uses: vimtor/action-zip@v1.1
-      with:
-        files: ./published/osx-arm64-cli/
-        recursive: true
-        dest: transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip
+      run: ditto -c -k --sequesterRsrc ./bundles/cli 'transcribe-cli-${{env.CLI_RELEASE}}-osx-arm64.zip'
 
     - name: Upload CLI Release Asset
       id: upload-release-asset-cli
