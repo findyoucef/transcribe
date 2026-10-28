@@ -1259,7 +1259,7 @@ public sealed class MainViewModel : ObservableObject
             if (diarizationResources != null)
             {
                 var diarizationModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
-                diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
+                diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo, diarizationResources.SpeechModelPath);
             }
 
             micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex, recordingPath: audioPath);
@@ -1318,7 +1318,7 @@ public sealed class MainViewModel : ObservableObject
             if (diarizationResources != null)
             {
                 var diarizationModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
-                speakerDiarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
+                speakerDiarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo, diarizationResources.SpeechModelPath);
             }
 
             speakerProcessor = new WhisperStreamProcessor(
@@ -1342,7 +1342,7 @@ public sealed class MainViewModel : ObservableObject
                 if (diarizationResources != null)
                 {
                     var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
-                    micDiarization = new DiarizationPipeline(micModel, diarizationOptions, LogInfo);
+                    micDiarization = new DiarizationPipeline(micModel, diarizationOptions, LogInfo, diarizationResources.SpeechModelPath);
                 }
 
                 micProcessor = new WhisperStreamProcessor(

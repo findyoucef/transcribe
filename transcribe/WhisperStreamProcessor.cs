@@ -204,27 +204,15 @@ namespace Transcribe
                     EnsureChunkSizeInitialized();
                     audioBuffer.AddRange(chunk);
 
-                    int threshold = chunkSizeBytes;
-                    int earlyThreshold = chunkSizeBytes; // default: no early processing
-
-                    // Allow earlier processing only for microphone to reduce latency
-                    if (recorder.IsMicrophone)
+                    // Prefer a short pause to cutting a word at the target duration.
+                    // Continuous speech still has a fixed memory and latency limit.
+                    int target = recorder.IsMicrophone ? Math.Max(2, chunkSizeBytes / 3) : chunkSizeBytes;
+                    int maximum = recorder.IsMicrophone ? chunkSizeBytes : chunkSizeBytes * 2;
+                    while (audioBuffer.Count >= target && (audioBuffer.Count >= maximum || HasTrailingPause()))
                     {
-                        earlyThreshold = Math.Max(1, chunkSizeBytes / 3);
-                    }
-
-                    if (audioBuffer.Count >= threshold)
-                    {
-                        var audioToProcess = audioBuffer.ToArray();
-                        audioBuffer.Clear();
-                        var baseOffset = audioCursor;
-                        AdvanceAudioCursor(audioToProcess.Length);
-                        await ProcessAudioChunk(audioToProcess, baseOffset);
-                    }
-                    else if (recorder.IsMicrophone && audioBuffer.Count >= earlyThreshold)
-                    {
-                        var audioToProcess = audioBuffer.ToArray();
-                        audioBuffer.Clear();
+                        int length = Math.Min(audioBuffer.Count, maximum);
+                        var audioToProcess = audioBuffer.GetRange(0, length).ToArray();
+                        audioBuffer.RemoveRange(0, length);
                         var baseOffset = audioCursor;
                         AdvanceAudioCursor(audioToProcess.Length);
                         await ProcessAudioChunk(audioToProcess, baseOffset);
@@ -253,6 +241,20 @@ namespace Transcribe
                 }
                 throw;
             }
+        }
+
+        private bool HasTrailingPause()
+        {
+            int length = Math.Min(audioBuffer.Count, bytesPerSecond / 5) & ~1; // 200 ms of PCM16.
+            if (length == 0) return false;
+            double energy = 0;
+            for (int i = audioBuffer.Count - length; i + 1 < audioBuffer.Count; i += 2)
+            {
+                short sample = (short)(audioBuffer[i] | (audioBuffer[i + 1] << 8));
+                double value = sample / 32768d;
+                energy += value * value;
+            }
+            return energy / (length / 2) <= 0.01 * 0.01;
         }
 
         private async Task ProcessAudioChunk(byte[] audioData, TimeSpan chunkBaseOffset)
@@ -415,12 +417,14 @@ namespace Transcribe
                 return;
             }
 
-            var session = diarization.CreateSession();
+            // Keep known voices across windows, including turns too short to create a new cluster.
+            var session = diarization.Session;
             session.ProcessAudioChunk(windowSamples, windowStart);
             session.Complete();
 
             var snapshot = session.Timeline.Snapshot();
             var mappedTimeline = BuildGlobalTimeline(snapshot, windowSamples, windowStart);
+            session.Timeline.Clear();
             diarizationWindows.Add(new WindowDiarization(windowStart, windowEnd, mappedTimeline));
         }
 

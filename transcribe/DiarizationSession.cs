@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Whisper.net;
 
 namespace Transcribe
 {
     public sealed class DiarizationSession
     {
         private readonly SpeakerEmbeddingModel model;
+        private readonly WhisperVadProcessor? speechDetector;
         private readonly OnlineClusterer clusterer;
         private readonly DiarizationTimeline timeline = new();
         private readonly Action<string>? log;
@@ -56,9 +58,10 @@ namespace Transcribe
         private float[]? candidateEmbeddingSum;
         private int candidateEmbeddingCount;
 
-        public DiarizationSession(SpeakerEmbeddingModel model, DiarizationOptions options, Action<string>? log = null)
+        public DiarizationSession(SpeakerEmbeddingModel model, DiarizationOptions options, Action<string>? log = null, WhisperVadProcessor? speechDetector = null)
         {
             this.model = model;
+            this.speechDetector = speechDetector;
             this.log = log;
             clusterer = new OnlineClusterer(options.SimilarityThreshold);
             sampleRate = model.Config.SampleRate;
@@ -126,6 +129,8 @@ namespace Transcribe
             }
 
             var combined = CombineResidual(samples, chunkBaseOffset, out var adjustedBaseOffset);
+            var speechRegions = speechDetector?.DetectSpeech(combined);
+            int speechIndex = 0;
             int offset = 0;
             var frameDuration = TimeSpan.FromSeconds(frameSize / (double)sampleRate);
 
@@ -135,6 +140,12 @@ namespace Transcribe
                 var rms = ComputeRms(combined, offset, frameSize);
 
                 bool speech = IsSpeech(rms);
+                if (speechRegions != null)
+                {
+                    var frameOffset = TimeSpan.FromSeconds(offset / (double)sampleRate);
+                    while (speechIndex < speechRegions.Count && speechRegions[speechIndex].End <= frameOffset) speechIndex++;
+                    speech = speechIndex < speechRegions.Count && speechRegions[speechIndex].Start < frameOffset + frameDuration;
+                }
                 if (speech)
                 {
                     if (!inSpeech)
@@ -160,10 +171,12 @@ namespace Transcribe
                 {
                     if (inSpeech)
                     {
+                        // Keep short pauses in the buffer so sample offsets stay on the audio timeline.
+                        AppendSamples(combined, offset, frameSize);
                         silenceFrames++;
                         if (silenceFrames >= minSilenceFrames)
                         {
-                            var segmentEnd = frameStart;
+                            var segmentEnd = frameStart + frameDuration;
                             FinalizeSegment(segmentEnd);
                             inSpeech = false;
                             silenceFrames = 0;

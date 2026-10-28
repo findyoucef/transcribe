@@ -78,7 +78,7 @@ namespace Transcribe
                         var transcript = Path.GetTempFileName();
                         temporary.Add(transcript);
                         using var recorder = new FileAudioRecorder(source);
-                        var pipeline = resources == null ? null : new DiarizationPipeline(new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, Console.WriteLine), options, Console.WriteLine);
+                        var pipeline = resources == null ? null : new DiarizationPipeline(new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, Console.WriteLine), options, Console.WriteLine, resources.SpeechModelPath);
                         using (var processor = new WhisperStreamProcessor(modelPath, context.ParseResult.GetValueForOption(language)!, recorder,
                             sourceLabel: timing.Source, showLevels: false, transcriptFilePath: transcript, diarization: pipeline))
                         {
@@ -402,7 +402,7 @@ namespace Transcribe
                         if (diarizationResources != null)
                         {
                             var modelInstance = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
-                            diarization = new DiarizationPipeline(modelInstance, diarizationSettings, Console.WriteLine);
+                            diarization = new DiarizationPipeline(modelInstance, diarizationSettings, Console.WriteLine, diarizationResources.SpeechModelPath);
                         }
 
                         using var processor = new WhisperStreamProcessor(
@@ -554,7 +554,7 @@ namespace Transcribe
                             if (diarizationResources != null)
                             {
                                 var modelInstance = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
-                                diarization = new DiarizationPipeline(modelInstance, diarizationOptions, Console.WriteLine);
+                                diarization = new DiarizationPipeline(modelInstance, diarizationOptions, Console.WriteLine, diarizationResources.SpeechModelPath);
                             }
 
                             using var processor = new WhisperStreamProcessor(
@@ -781,7 +781,7 @@ namespace Transcribe
                         if (diarizationResources != null)
                         {
                             var speakerModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
-                            speakerDiarization = new DiarizationPipeline(speakerModel, diarizationOptions, Console.WriteLine);
+                            speakerDiarization = new DiarizationPipeline(speakerModel, diarizationOptions, Console.WriteLine, diarizationResources.SpeechModelPath);
                         }
 
                         using var speakerProcessor = new WhisperStreamProcessor(
@@ -806,7 +806,7 @@ namespace Transcribe
                             if (diarizationResources != null)
                             {
                                 var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, Console.WriteLine);
-                                micDiarization = new DiarizationPipeline(micModel, diarizationOptions, Console.WriteLine);
+                                micDiarization = new DiarizationPipeline(micModel, diarizationOptions, Console.WriteLine, diarizationResources.SpeechModelPath);
                             }
 
                             micProcessor = new WhisperStreamProcessor(

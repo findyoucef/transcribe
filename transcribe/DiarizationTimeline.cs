@@ -78,7 +78,7 @@ namespace Transcribe
                     return bestSingle.Speaker;
                 }
 
-                var last = segments.OrderByDescending(s => s.End).FirstOrDefault();
+                var last = segments.Where(s => s.End <= start).OrderByDescending(s => s.End).FirstOrDefault();
                 if (last != null && start - last.End <= TimeSpan.FromSeconds(1))
                 {
                     return last.Speaker;
@@ -94,6 +94,11 @@ namespace Transcribe
             {
                 return segments.ToList();
             }
+        }
+
+        public void Clear()
+        {
+            lock (sync) segments.Clear();
         }
 
         private static bool IsOverlapLabel(string label)

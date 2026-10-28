@@ -147,8 +147,8 @@ namespace Transcribe
             log?.Invoke("Running diarization...");
 
             var resources = await DiarizationModelLoader.EnsureResourcesAsync(options, log);
-            using var model = new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, log);
-            var session = new DiarizationSession(model, options, log);
+            using var pipeline = new DiarizationPipeline(new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, log), options, log, resources.SpeechModelPath);
+            var session = pipeline.Session;
 
             progress?.Report(progressStart);
 

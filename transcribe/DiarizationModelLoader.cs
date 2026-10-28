@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Whisper.net.Ggml;
 
 namespace Transcribe
 {
@@ -44,7 +45,24 @@ namespace Transcribe
             }
 
             var config = SpeakerEmbeddingModelConfig.Load(configPath, log);
-            return new DiarizationResources(modelPath, config, configPath);
+            var speechModelPath = Path.Combine(OperatingSystem.IsMacOS()
+                ? TranscribeDefaults.MacModelCacheDirectory
+                : Path.Combine(AppContext.BaseDirectory, "models"), "ggml-silero-v6.2.0.bin");
+            if (!File.Exists(speechModelPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(speechModelPath)!);
+                var temporary = speechModelPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try
+                {
+                    log?.Invoke($"Downloading speech detection model to: {speechModelPath}");
+                    await using (var input = await WhisperGgmlDownloader.Default.GetGgmlSileroVadModelAsync())
+                    await using (var output = File.Create(temporary))
+                        await input.CopyToAsync(output);
+                    File.Move(temporary, speechModelPath, overwrite: true);
+                }
+                finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            }
+            return new DiarizationResources(modelPath, config, configPath) { SpeechModelPath = speechModelPath };
         }
 
         private static string ResolvePath(string? path, string fallback)

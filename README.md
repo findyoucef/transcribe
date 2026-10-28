@@ -67,7 +67,7 @@ Notes:
 ```
 - Shows a live audio-level bar; press `Ctrl+C` to stop.
 - Saves a timestamped transcript to a new GUID-named `.txt` file in the working directory.
-- Defaults: device `0`, chunk size `3s`.
+- Defaults: device `0`, chunk size `7s`.
 - Add `--summarize` to stream a summary via Ollama after transcription finishes.
 - List devices first with `./transcribe list-devices`.
  - Use `--output-dir <folder>` to write the transcript somewhere other than the working directory.
@@ -78,10 +78,15 @@ Notes:
 ```
 - Captures system output via WASAPI loopback on Windows, Core Audio taps on macOS 14.2+, or a loopback input on older Macs/Linux.
 - Optionally capture your mic simultaneously (`--mic-device <n>`, default `-1` disables). Speaker and mic audio are processed separately and merged chronologically into one transcript.
-- Same defaults and output behavior as microphone mode (chunk `3s`, device `0`, summary disabled by default).
+- Same defaults and output behavior as microphone mode (chunk `7s`, device `0`, summary disabled by default).
 - Add `--summarize` to stream a summary via Ollama after transcription finishes.
 - List speakers first with `./transcribe list-speakers`.
  - Use `--output-dir <folder>` to write the transcript somewhere other than the working directory.
+
+Live processing prefers a short pause when cutting audio into chunks. System
+audio can wait up to twice the configured chunk size; microphone audio uses
+earlier pauses and never waits longer than the configured size. This reduces
+words cut off at chunk boundaries while keeping continuous speech bounded.
 
 Native macOS and PortAudio live capture save each source as a WAV in a `.audio`
 directory beside the transcript. Transcription reads its backlog from disk, so a
@@ -236,6 +241,10 @@ Enable diarization to add speaker labels (e.g., `[S1]`, `[SPK:S2]`) to the trans
 - Optional: `--diarization-model <path>` overrides the local model path.
 - Optional: `--diarization-model-url <url>` downloads the model if it is missing.
 - Optional: `--diarization-config <path>` uses a custom config JSON (default `models/speaker_diarization.json`).
+
+Diarization also downloads a small Silero speech-detection model on first use
+to keep music and other non-speech audio out of speaker clustering. On macOS,
+downloaded models are cached in `~/Library/Application Support/Transcribe/models`.
 
 On macOS 12 or later, speaker identification automatically uses CoreML when the
 bundled ONNX Runtime supports it. Unsupported operations run on CPU. If CoreML
