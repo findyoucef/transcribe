@@ -46,6 +46,9 @@ namespace Transcribe.PortAudio
         public static extern PaError Pa_StopStream(IntPtr stream);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern PaError Pa_AbortStream(IntPtr stream);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern PaError Pa_CloseStream(IntPtr stream);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]

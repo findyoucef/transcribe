@@ -1,6 +1,8 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
 
 namespace Transcribe
 {
@@ -18,6 +20,7 @@ namespace Transcribe
             // Stream file through live pipeline (for testing)
             var streamFileCommand = CreateStreamFileCommand();
             rootCommand.AddCommand(streamFileCommand);
+            rootCommand.AddCommand(CreateRecoverCommand());
 
             // Microphone transcription command
             var micCommand = CreateMicCommand();
@@ -40,6 +43,66 @@ namespace Transcribe
             rootCommand.AddCommand(installBlackHoleCommand);
 
             return await rootCommand.InvokeAsync(args);
+        }
+
+        private static Command CreateRecoverCommand()
+        {
+            var directory = new Argument<string>("archive", "The .audio directory saved beside a meeting transcript.");
+            var model = new Option<string>("--model", () => TranscribeDefaults.DefaultModel);
+            var language = new Option<string>("--language", () => TranscribeDefaults.DefaultLanguage);
+            var diarize = new Option<bool>("--diarize", "Rebuild speaker labels as well as text.");
+            var command = new Command("recover", "Rebuild a complete transcript from saved audio without overwriting the original.")
+            {
+                directory, model, language, diarize
+            };
+            command.SetHandler(async (InvocationContext context) =>
+            {
+                var temporary = new List<string>();
+                try
+                {
+                    var archive = Path.GetFullPath(context.ParseResult.GetValueForArgument(directory));
+                    var output = Path.ChangeExtension(archive, "recovered.txt");
+                    if (File.Exists(output)) throw new IOException($"Recovered transcript already exists: {output}");
+                    var sources = Directory.GetFiles(archive, "*.wav");
+                    if (sources.Length == 0) throw new IOException("No saved audio found.");
+                    var modelPath = await WhisperClient.EnsureModelDownloaded(context.ParseResult.GetValueForOption(model)!);
+                    var options = new DiarizationOptions { Enabled = context.ParseResult.GetValueForOption(diarize) };
+                    var resources = options.Enabled ? await DiarizationModelLoader.EnsureResourcesAsync(options, Console.WriteLine) : null;
+                    var lines = new List<string>();
+                    foreach (var source in sources)
+                    {
+                        var timing = JsonSerializer.Deserialize<RecordingArchive.SourceTiming>(File.ReadAllText(Path.ChangeExtension(source, "json")))
+                            ?? throw new InvalidDataException($"Missing audio timing: {source}");
+                        if (timing.Source is not ("SPK" or "MIC") || !double.IsFinite(timing.OffsetSeconds) || timing.OffsetSeconds < 0)
+                            throw new InvalidDataException($"Invalid audio timing: {source}");
+                        var transcript = Path.GetTempFileName();
+                        temporary.Add(transcript);
+                        using var recorder = new FileAudioRecorder(source);
+                        var pipeline = resources == null ? null : new DiarizationPipeline(new SpeakerEmbeddingModel(resources.ModelPath, resources.Config, Console.WriteLine), options, Console.WriteLine);
+                        using (var processor = new WhisperStreamProcessor(modelPath, context.ParseResult.GetValueForOption(language)!, recorder,
+                            sourceLabel: timing.Source, showLevels: false, transcriptFilePath: transcript, diarization: pipeline))
+                        {
+                            recorder.StartRecording();
+                            processor.StartProcessing(TimeSpan.FromSeconds(timing.OffsetSeconds));
+                            await processor.WaitForCompletionAsync();
+                            recorder.StopRecording();
+                        }
+                        lines.AddRange(File.ReadAllLines(transcript));
+                    }
+                    var staging = output + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    temporary.Add(staging);
+                    await File.WriteAllLinesAsync(staging, lines.OrderBy(line => TimeSpan.Parse(line.AsSpan(0, line.IndexOf("->", StringComparison.Ordinal)), CultureInfo.InvariantCulture)));
+                    File.Move(staging, output);
+                    Console.WriteLine($"Recovered transcript: {output}");
+                }
+                catch (Exception ex)
+                {
+                    context.ExitCode = 1;
+                    Console.Error.WriteLine($"Recovery failed: {ex.Message}");
+                }
+                finally { foreach (var path in temporary) File.Delete(path); }
+            });
+            return command;
         }
 
         private static Command CreateInstallBlackHoleCommand()
@@ -213,6 +276,7 @@ namespace Transcribe
                 }
                 catch (Exception ex)
                 {
+                    context.ExitCode = 1;
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
             });
@@ -366,6 +430,7 @@ namespace Transcribe
                 }
                 catch (Exception ex)
                 {
+                    context.ExitCode = 1;
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
             });
@@ -479,9 +544,11 @@ namespace Transcribe
                     Console.WriteLine();
 
                     var micTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
+                    var archive = new RecordingArchive(micTranscript);
+                    var audioPath = archive.CreatePath("MIC");
                     {
                         DiarizationPipeline? diarization = null;
-                        using var recorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: device);
+                        using var recorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: device, recordingPath: audioPath);
                         try
                         {
                             if (diarizationResources != null)
@@ -499,25 +566,25 @@ namespace Transcribe
                                 diarization: diarization);
 
                             recorder.StartRecording();
-                            processor.StartProcessing();
+                            processor.StartProcessing(archive.Started(audioPath, "MIC"));
 
                             // Wait for Ctrl+C
                             var tcs = new TaskCompletionSource<bool>();
-                            Console.CancelKeyPress += (s, e) =>
+                            ConsoleCancelEventHandler cancel = (s, e) =>
                             {
                                 e.Cancel = true;
                                 tcs.TrySetResult(true);
                             };
 
-                            await tcs.Task;
-
-                            Console.WriteLine();
-                            Console.WriteLine("Stopping transcription...");
-                        
-                            recorder.StopRecording();
-                            await processor.StopProcessing();
-
-                            diarization = null;
+                            diarization = null; // Owned by the processor.
+                            Console.CancelKeyPress += cancel;
+                            try { await await Task.WhenAny(tcs.Task, processor.Completion); }
+                            finally
+                            {
+                                Console.CancelKeyPress -= cancel;
+                                recorder.StopRecording();
+                                await processor.StopProcessing();
+                            }
                         }
                         finally
                         {
@@ -544,6 +611,7 @@ namespace Transcribe
                 }
                 catch (Exception ex)
                 {
+                    context.ExitCode = 1;
                     Console.Error.WriteLine($"Error: {ex.Message}");
                 }
             });
@@ -696,10 +764,13 @@ namespace Transcribe
                     Console.WriteLine("Press Ctrl+C to stop...");
                     Console.WriteLine();
 
-                    using var speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: device);
-
                     // Create shared transcript file path (GUID-based to match existing convention)
-                    var sharedTranscript = ResolveTranscriptPath($"{Guid.NewGuid():N}.txt", outputDir);
+                    var meetingId = Guid.TryParse(Environment.GetEnvironmentVariable("TX_MEETING_ID"), out var id) ? id : Guid.NewGuid();
+                    var sharedTranscript = ResolveTranscriptPath($"{meetingId:N}.txt", outputDir);
+                    var archive = new RecordingArchive(sharedTranscript);
+                    var speakerAudio = archive.CreatePath("SPK");
+                    var micAudio = archive.CreatePath("MIC");
+                    using var speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: device, recordingPath: speakerAudio);
                     using var merger = new TranscriptionMerger(sharedTranscript, TimeSpan.FromSeconds(3));
 
                     // Speaker processor
@@ -727,7 +798,7 @@ namespace Transcribe
 
                         // Optional mic
                         using var micRecorder = micDevice >= 0
-                            ? AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micDevice, echoCancellation: echoCancellation)
+                            ? AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micDevice, echoCancellation: echoCancellation, recordingPath: micAudio)
                             : null;
                         WhisperStreamProcessor? micProcessor = null;
                         if (micRecorder != null)
@@ -756,9 +827,10 @@ namespace Transcribe
                         try
                         {
                             micRecorder?.StartRecording();
+                            var micOffset = micRecorder != null ? archive.Started(micAudio, "MIC") : TimeSpan.Zero;
                             speakerRecorder.StartRecording();
-                            speakerProcessor.StartProcessing();
-                            micProcessor?.StartProcessing();
+                            speakerProcessor.StartProcessing(archive.Started(speakerAudio, "SPK"));
+                            micProcessor?.StartProcessing(micOffset);
                             if (echoCancellation)
                                 Console.WriteLine("Microphone echo cancellation enabled (Apple voice processing; minimum playback ducking).");
 
@@ -769,7 +841,12 @@ namespace Transcribe
                                 tcs.TrySetResult(true);
                             };
                             Console.CancelKeyPress += cancel;
-                            try { await tcs.Task; }
+                            try
+                            {
+                                var tasks = new List<Task> { tcs.Task, speakerProcessor.Completion };
+                                if (micProcessor != null) tasks.Add(micProcessor.Completion);
+                                await await Task.WhenAny(tasks);
+                            }
                             finally { Console.CancelKeyPress -= cancel; }
                         }
                         finally
@@ -777,12 +854,11 @@ namespace Transcribe
                             Console.WriteLine("Stopping transcription...");
                             speakerRecorder.StopRecording();
                             micRecorder?.StopRecording();
-                            await speakerProcessor.StopProcessing();
-                            if (micProcessor != null)
+                            try
                             {
-                                await micProcessor.StopProcessing();
-                                micProcessor.Dispose();
+                                await Task.WhenAll(speakerProcessor.StopProcessing(), micProcessor?.StopProcessing() ?? Task.CompletedTask);
                             }
+                            finally { micProcessor?.Dispose(); }
                         }
                         // Ensure merger closes its writer before reading the transcript
                         merger.Dispose();

@@ -13,6 +13,19 @@ namespace transcribe.tests
     public class TranscriptionMergerTests
     {
         [TestMethod]
+        public void Dispose_ShouldDrainPendingTranscriptItems()
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                using (var merger = new TranscriptionMerger(path, TimeSpan.FromHours(1)))
+                    merger.Submit(Enumerable.Range(0, 100).Select(i => new TranscriptionItem(TimeSpan.FromSeconds(i), TimeSpan.FromSeconds(i + 1), $"item {i}", "SPK")));
+                File.ReadAllLines(path).Should().HaveCount(100);
+            }
+            finally { File.Delete(path); }
+        }
+
+        [TestMethod]
         public async Task Submit_ShouldWriteOrderedItemsToFile()
         {
             var tempFile = Path.GetTempFileName();

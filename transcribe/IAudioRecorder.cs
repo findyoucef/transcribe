@@ -9,5 +9,6 @@ namespace Transcribe
         MemoryStream CreateWavStream(byte[] audioData);
         int GetBytesPerSecond();
         bool IsMicrophone { get; }
+        TimeSpan? Backlog => null;
     }
 }

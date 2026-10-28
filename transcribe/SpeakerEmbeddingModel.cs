@@ -9,7 +9,9 @@ namespace Transcribe
 {
     public sealed class SpeakerEmbeddingModel : IDisposable
     {
-        private readonly InferenceSession session;
+        private InferenceSession session;
+        private readonly string modelPath;
+        private bool usingCoreML;
         private readonly LogMelExtractor melExtractor;
         private readonly SpeakerEmbeddingModelConfig config;
         private readonly string inputName;
@@ -18,11 +20,28 @@ namespace Transcribe
         private readonly IReadOnlyList<ExtraInputSpec> extraInputs;
         private readonly Action<string>? log;
 
-        public SpeakerEmbeddingModel(string modelPath, SpeakerEmbeddingModelConfig config, Action<string>? log = null)
+        public SpeakerEmbeddingModel(string modelPath, SpeakerEmbeddingModelConfig config, Action<string>? log = null, string? executionProvider = null)
         {
             this.log = log;
-            var options = new SessionOptions();
-            session = new InferenceSession(modelPath, options);
+            this.modelPath = modelPath;
+            var provider = (executionProvider ?? Environment.GetEnvironmentVariable("TX_DIARIZATION_PROVIDER") ?? "auto").ToLowerInvariant();
+            if (provider is not ("auto" or "cpu" or "coreml"))
+                throw new ArgumentException("Diarization provider must be auto, cpu, or coreml.", nameof(executionProvider));
+            usingCoreML = provider != "cpu" && OperatingSystem.IsMacOSVersionAtLeast(12)
+                && OrtEnv.Instance().GetAvailableProviders().Contains("CoreMLExecutionProvider");
+            if (provider == "coreml" && !usingCoreML)
+                log?.Invoke("CoreML is unavailable; using CPU for speaker identification.");
+            try
+            {
+                session = CreateSession(usingCoreML);
+            }
+            catch (Exception ex) when (usingCoreML && ex is OnnxRuntimeException or NotSupportedException)
+            {
+                log?.Invoke($"CoreML initialization failed; using CPU: {ex.Message}");
+                usingCoreML = false;
+                session = CreateSession(false);
+            }
+            log?.Invoke($"Diarization execution provider: {(usingCoreML ? "CoreML (unsupported operations use CPU)" : "CPU")}");
 
             inputName = !string.IsNullOrWhiteSpace(config.InputName)
                 ? config.InputName
@@ -66,12 +85,38 @@ namespace Transcribe
 
             lock (runLock)
             {
-                using var results = session.Run(inputs);
-                var output = results.First(r => string.Equals(r.Name, outputName, StringComparison.OrdinalIgnoreCase))
-                    .AsEnumerable<float>()
-                    .ToArray();
-                return Normalize(output);
+                IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results;
+                try
+                {
+                    results = session.Run(inputs);
+                }
+                catch (OnnxRuntimeException ex) when (usingCoreML)
+                {
+                    log?.Invoke($"CoreML inference failed; retrying on CPU: {ex.Message}");
+                    session.Dispose();
+                    usingCoreML = false;
+                    session = CreateSession(false);
+                    results = session.Run(inputs);
+                }
+                using (results)
+                {
+                    var output = results.First(r => string.Equals(r.Name, outputName, StringComparison.OrdinalIgnoreCase))
+                        .AsEnumerable<float>()
+                        .ToArray();
+                    return Normalize(output);
+                }
             }
+        }
+
+        private InferenceSession CreateSession(bool coreML)
+        {
+            using var options = new SessionOptions();
+            if (coreML)
+            {
+                // ONNX Runtime 1.20's C# generic provider API does not support CoreML.
+                options.AppendExecutionProvider_CoreML(CoreMLFlags.COREML_FLAG_CREATE_MLPROGRAM);
+            }
+            return new InferenceSession(modelPath, options);
         }
 
         private DenseTensor<float> CreateInputTensor(float[] features, int frameCount)

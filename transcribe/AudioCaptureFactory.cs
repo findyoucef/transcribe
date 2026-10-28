@@ -2,7 +2,7 @@ namespace Transcribe
 {
     public static class AudioCaptureFactory
     {
-        public static IAudioRecorder CreateMicrophoneRecorder(int deviceIndex = 0, int sampleRate = 16000, int channels = 1, bool echoCancellation = false)
+        public static IAudioRecorder CreateMicrophoneRecorder(int deviceIndex = 0, int sampleRate = 16000, int channels = 1, bool echoCancellation = false, string? recordingPath = null)
         {
             if (echoCancellation)
             {
@@ -10,17 +10,17 @@ namespace Transcribe
                     throw new PlatformNotSupportedException("Echo cancellation currently requires macOS 14.2 or later.");
                 if (sampleRate != 16000 || channels != 1)
                     throw new ArgumentException("Echo-cancelled transcription requires 16 kHz mono output.");
-                return new MacAudio.MacAudioRecorder(deviceIndex);
+                return new MacAudio.MacAudioRecorder(deviceIndex, recordingPath);
             }
             if (OperatingSystem.IsWindows())
             {
                 return new MicrophoneRecorder(sampleRate, channels, deviceIndex);
             }
             
-            return new PortAudio.PortAudioRecorder(deviceIndex, sampleRate, channels);
+            return new PortAudio.PortAudioRecorder(deviceIndex, sampleRate, channels, recordingPath: recordingPath);
         }
 
-        public static IAudioRecorder CreateSpeakerRecorder(int deviceIndex = 0)
+        public static IAudioRecorder CreateSpeakerRecorder(int deviceIndex = 0, string? recordingPath = null)
         {
             if (OperatingSystem.IsWindows())
             {
@@ -31,11 +31,11 @@ namespace Transcribe
             {
                 if (deviceIndex != 0)
                     throw new ArgumentOutOfRangeException(nameof(deviceIndex), "Native macOS capture uses device 0 (System Audio). Use list-speakers to see available devices.");
-                return new MacAudio.MacAudioRecorder();
+                return new MacAudio.MacAudioRecorder(recordingPath: recordingPath);
             }
 
             // Older Macs and Linux use a loopback/monitor input.
-            return new PortAudio.PortAudioRecorder(deviceIndex, 16000, 1, isLoopback: true);
+            return new PortAudio.PortAudioRecorder(deviceIndex, 16000, 1, isLoopback: true, recordingPath: recordingPath);
         }
 
         public static IEnumerable<AudioDeviceInfo> GetMicrophones()

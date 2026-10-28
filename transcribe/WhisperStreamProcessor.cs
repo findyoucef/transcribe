@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using Whisper.net;
 
 namespace Transcribe
@@ -38,6 +39,8 @@ namespace Transcribe
         private TimeSpan nextDiarizationWindowStart = TimeSpan.Zero;
         private string? lastEmittedSpeaker;
         private bool diarizationFinalized;
+        private TimeSpan lastTimingReport;
+        public Task Completion => processingTask ?? Task.CompletedTask;
 
         private sealed record PendingSegment(TimeSpan Start, TimeSpan End, string Text, string Source);
         private sealed record WindowDiarization(TimeSpan Start, TimeSpan End, DiarizationTimeline Timeline);
@@ -94,8 +97,11 @@ namespace Transcribe
             }
         }
 
-        public void StartProcessing()
+        public void StartProcessing(TimeSpan? timelineOffset = null)
         {
+            audioCursor = timelineOffset ?? TimeSpan.Zero;
+            nextDiarizationWindowStart = audioCursor;
+            lastTimingReport = audioCursor;
             EnsureChunkSizeInitialized();
             var message = $"Saving transcript to: {transcriptFileName}" + (sourceLabel != null ? $" [{sourceLabel}]" : string.Empty);
             if (emitConsoleOutput)
@@ -107,8 +113,6 @@ namespace Transcribe
             {
                 onStatus?.Invoke(message);
             }
-
-            audioCursor = TimeSpan.Zero;
 
             processingTask = Task.Run(() => ProcessAudioLoop());
             if (showLevels)
@@ -247,6 +251,7 @@ namespace Transcribe
                 {
                     onStatus?.Invoke(message);
                 }
+                throw;
             }
         }
 
@@ -254,6 +259,7 @@ namespace Transcribe
         {
             try
             {
+                var timer = Stopwatch.StartNew();
                 using var wavStream = recorder.CreateWavStream(audioData);
 
                 float[]? diarizationSamples = null;
@@ -265,7 +271,6 @@ namespace Transcribe
                         var wavBytes = wavStream.ToArray();
                         diarizationSamples = AudioUtils.ReadWavBytesAsMono(wavBytes, diarizationSampleRate);
                         BufferDiarizationSamples(diarizationSamples, chunkBaseOffset);
-                        diarization.Session.ProcessAudioChunk(diarizationSamples, chunkBaseOffset);
                         wavStream.Position = 0;
                     }
                 }
@@ -299,6 +304,7 @@ namespace Transcribe
                     }
                 }
 
+                var whisperSeconds = timer.Elapsed.TotalSeconds;
                 if (diarization != null)
                 {
                     if (pending.Count > 0)
@@ -311,6 +317,15 @@ namespace Transcribe
                 }
 
                 EmitItems(items);
+                if (audioCursor - lastTimingReport >= TimeSpan.FromSeconds(30)
+                    || timer.Elapsed.TotalSeconds >= audioData.Length / (double)bytesPerSecond)
+                {
+                    var message = $"[{DateTimeOffset.Now:O}] [{sourceLabel}] audio processed={audioCursor.TotalSeconds:F1}s, " +
+                        $"chunk={audioData.Length / (double)bytesPerSecond:F2}s, whisper={whisperSeconds:F3}s, " +
+                        $"speaker identification={timer.Elapsed.TotalSeconds - whisperSeconds:F3}s, backlog={recorder.Backlog?.TotalSeconds:F1}s";
+                    if (emitConsoleOutput) Console.WriteLine(message); else onStatus?.Invoke(message);
+                    lastTimingReport = audioCursor;
+                }
             }
             catch (Exception ex)
             {
@@ -323,6 +338,7 @@ namespace Transcribe
                 {
                     onStatus?.Invoke(message);
                 }
+                throw;
             }
         }
 
@@ -789,7 +805,6 @@ namespace Transcribe
             ProcessFinalDiarizationWindow();
             FlushReadySegments(final: true);
 
-            diarization.Session.Complete();
         }
 
         private void AdvanceAudioCursor(int byteCount)
@@ -800,17 +815,17 @@ namespace Transcribe
 
         public async Task StopProcessing()
         {
-            cancellationTokenSource.Cancel();
-            if (processingTask != null)
+            // The caller stops capture first. Drain its saved audio before finalizing.
+            try
             {
-                await processingTask;
+                if (processingTask != null) await processingTask;
             }
-            if (visualizationTask != null)
+            finally
             {
-                await visualizationTask;
+                cancellationTokenSource.Cancel();
+                if (visualizationTask != null) await visualizationTask;
+                FinalizeDiarization();
             }
-
-            FinalizeDiarization();
         }
 
         public async Task WaitForCompletionAsync()
@@ -819,6 +834,7 @@ namespace Transcribe
             {
                 await processingTask;
             }
+            cancellationTokenSource.Cancel();
             if (visualizationTask != null)
             {
                 await visualizationTask;
@@ -830,22 +846,24 @@ namespace Transcribe
         public void Dispose()
         {
             cancellationTokenSource.Cancel();
-            processingTask?.Wait();
-            visualizationTask?.Wait();
+            recorder.StopRecording();
+            try { processingTask?.GetAwaiter().GetResult(); } catch { /* Reported by Completion and the processing log. */ }
+            try { visualizationTask?.GetAwaiter().GetResult(); } catch { }
 
-            FinalizeDiarization();
-
-            if (merger == null)
+            try { FinalizeDiarization(); }
+            catch (Exception ex)
             {
-                transcriptWriter?.Flush();
-                transcriptWriter?.Dispose();
+                var message = $"Could not finalize speaker labels; recover the saved audio: {ex.Message}";
+                if (emitConsoleOutput) Console.Error.WriteLine(message); else onStatus?.Invoke(message);
             }
-
-            diarization?.Dispose();
-
-            processor?.Dispose();
-            whisperFactory?.Dispose();
-            cancellationTokenSource.Dispose();
+            finally
+            {
+                if (merger == null) transcriptWriter?.Dispose();
+                diarization?.Dispose();
+                processor?.Dispose();
+                whisperFactory?.Dispose();
+                cancellationTokenSource.Dispose();
+            }
         }
     }
 }

@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\transcribe\transcribe.csproj" />
+    <None Update="Assets/embedding.onnx" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets/sample.wav" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

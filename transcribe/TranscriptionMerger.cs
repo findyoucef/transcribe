@@ -13,7 +13,6 @@ namespace Transcribe
         private readonly object writeLock = new();
         private readonly StreamWriter writer;
         private readonly TimeSpan flushWindow;
-        private readonly CancellationTokenSource cts = new();
         private Task? worker;
         private int disposedFlag = 0;
 
@@ -28,44 +27,30 @@ namespace Transcribe
 
         public void Submit(IEnumerable<TranscriptionItem> items)
         {
+            if (worker?.IsFaulted == true) worker.GetAwaiter().GetResult();
             foreach (var item in items)
             {
                 queue.Add(item);
             }
         }
 
-        private async Task WorkLoop()
+        private void WorkLoop()
         {
             var lastFlush = DateTime.UtcNow;
-            try
+            while (!queue.IsCompleted)
             {
-                while (!cts.Token.IsCancellationRequested)
+                if (queue.TryTake(out var item, 100))
                 {
-                    if (queue.TryTake(out var item, 100))
-                    {
-                        buffer.Add(item);
-                    }
-
-                    var now = DateTime.UtcNow;
-                    if ((now - lastFlush) >= flushWindow && buffer.Count > 0)
-                    {
-                        FlushBuffer();
-                        lastFlush = now;
-                    }
-
-                    await Task.Delay(10, cts.Token);
+                    buffer.Add(item);
                 }
-
-                // Final flush
-                if (buffer.Count > 0)
+                var now = DateTime.UtcNow;
+                if ((now - lastFlush) >= flushWindow && buffer.Count > 0)
                 {
                     FlushBuffer();
+                    lastFlush = now;
                 }
             }
-            catch
-            {
-                // swallow
-            }
+            if (buffer.Count > 0) FlushBuffer();
         }
 
         private void FlushBuffer()
@@ -88,18 +73,16 @@ namespace Transcribe
                 return; // already disposed
             }
 
-            try { cts.Cancel(); } catch (ObjectDisposedException) { }
-            try { worker?.Wait(); } catch { }
+            queue.CompleteAdding();
             try
             {
-                lock (writeLock)
-                {
-                    writer.Dispose();
-                }
+                worker?.GetAwaiter().GetResult();
             }
-            catch { }
-            try { queue.Dispose(); } catch { }
-            try { cts.Dispose(); } catch { }
+            finally
+            {
+                writer.Dispose();
+                queue.Dispose();
+            }
         }
     }
 }

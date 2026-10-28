@@ -83,6 +83,21 @@ Notes:
 - List speakers first with `./transcribe list-speakers`.
  - Use `--output-dir <folder>` to write the transcript somewhere other than the working directory.
 
+Native macOS and PortAudio live capture save each source as a WAV in a `.audio`
+directory beside the transcript. Transcription reads its backlog from disk, so a
+slow model does not fill a fixed packet queue. Each source has a 2 GiB limit;
+storage errors stop capture explicitly. Backups remain until you delete them.
+Normal shutdown drains pending audio and transcript lines. If shutdown is forced,
+the WAV and its timing JSON allow recovery:
+
+```bash
+tx recover ~/transcripts/MEETING_ID.audio --model LargeV3Turbo --diarize
+```
+
+Recovery writes `MEETING_ID.recovered.txt`, preserves source labels and timing,
+and refuses to overwrite an existing recovered transcript. Wait for recording to
+stop before recovering it. Keep the WAV and matching JSON files together.
+
 ### macOS native system audio capture (14.2+)
 
 1) Open `Transcribe.app` and select **Speaker > System Audio (Native)**, or run `./tx speaker` from the CLI release.
@@ -114,7 +129,9 @@ Validation on a Mac:
 ```bash
 dotnet test transcribe.tests
 bash scripts/test-macos-audio.sh
-# Opt-in hardware test: plays two short tones and records them in memory.
+# Prerecorded inference tests; use an already downloaded model.
+TX_TEST_WHISPER_MODEL="$HOME/Library/Application Support/Transcribe/models/ggml-tiny.en.bin" dotnet test transcribe.tests --filter TestCategory=Inference
+# Opt-in hardware test: plays two short tones and uses temporary audio files.
 TRANSCRIBE_TEST_MAC_AUDIO=1 dotnet test transcribe.tests --filter TestCategory=MacAudioLive
 ```
 
@@ -138,6 +155,51 @@ The optional acoustic test plays the same speech twice and compares raw and proc
 ```bash
 TRANSCRIBE_TEST_MAC_AEC_DEVICE=1 dotnet test transcribe.tests --filter TestCategory=MacAecLive
 ```
+
+### Native meeting watcher on macOS
+
+`record-meeting/` is a standalone .NET 10 Native AOT utility that watches Teams
+meeting-window close-prompt events and Zoom desktop meeting processes, then runs the
+installed `tx` CLI. Teams detection follows the main window's `meeting` prompt
+until it is cleared or the window is disposed; the transient `CallMonitor` mini
+window does not control recording. Meeting state survives log rotation and is
+reconstructed from retained logs when the watcher starts. Zoom detection checks
+for a `CptHost` child of the Zoom executable in the same application bundle and
+current user session; merely
+opening Zoom does not start recording. Set `zoom_detection: false` in the JSON
+configuration to disable it. Browser-based Zoom meetings are not detected.
+Recording continues while either app has an active meeting, then uses the
+configured grace period after both are idle. Detection needs no Accessibility
+permission. It preserves the
+record-meeting skill's JSON configuration, transcript/state paths, microphone
+fallback, automatic echo cancellation, and recording grace period. The
+published executable needs neither Python nor an installed .NET runtime.
+
+Build and test on the target Mac with the .NET 10 SDK and Xcode Command Line Tools:
+
+```bash
+bash scripts/build-record-meeting.sh
+published/record-meeting/record-meeting-watcher check
+published/record-meeting/record-meeting-watcher detect
+```
+
+The build script runs isolated synthetic-call tests, including process locking,
+log rotation, Zoom process matching, grace/resume, child failures, and graceful transcript flushing.
+Those tests do not record audio. `check` resolves devices and prints the capture
+arguments without starting a recording.
+
+To update an existing local record-meeting skill, copy the executable to
+`bin/record-meeting-watcher.new` and rename it to `bin/record-meeting-watcher`
+so a running executable is replaced atomically. Install
+`record-meeting/record-meeting.sh` in the skill's `scripts/` directory.
+Run the controller's `install` command while the watcher is idle to
+update the launch agent to the native executable. Existing configuration and
+transcripts are retained. `status`, `start`, `stop`, `restart`, `devices`, `logs`,
+`latest`, and `config` remain available through the controller.
+Capture or inference failures exit the recorder with an error and trigger the
+watcher's existing retry delay while a meeting remains active. Retries retain
+the same meeting ID and transcript timeline. Audio backups use separate files
+for each attempt. `latest` selects text transcripts only.
 
 ### Older macOS system audio capture (BlackHole)
 On macOS before 14.2, install a loopback device and route output to it.
@@ -167,13 +229,27 @@ Supported values (downloaded on first use):
 ### Languages
 - Default is `en`. Pass ISO codes (e.g., `en`, `fr`, `es`) or `auto` for language detection.
 
-### Speaker diarization (offline)
+### Speaker diarization
 Enable diarization to add speaker labels (e.g., `[S1]`, `[SPK:S2]`) to the transcript output.
 - Requires a speaker-embedding ONNX model (default expected at `models/voxceleb_resnet293_LM.onnx` next to the binary).
 - Use `--diarize` to enable it for `file`, `mic`, or `speaker` commands.
 - Optional: `--diarization-model <path>` overrides the local model path.
 - Optional: `--diarization-model-url <url>` downloads the model if it is missing.
 - Optional: `--diarization-config <path>` uses a custom config JSON (default `models/speaker_diarization.json`).
+
+On macOS 12 or later, speaker identification automatically uses CoreML when the
+bundled ONNX Runtime supports it. Unsupported operations run on CPU. If CoreML
+initialization or inference fails, the model retries on CPU and logs the reason.
+This selects acceleration for speaker identification; Whisper keeps its own
+runtime selection. Use `TX_DIARIZATION_PROVIDER=cpu` to force CPU processing, or
+`auto` (the default) / `coreml` to request CoreML with CPU fallback. For example:
+
+```bash
+TX_DIARIZATION_PROVIDER=cpu tx stream-file sample.wav --model LargeV3Turbo --diarize
+```
+
+Live processing logs the selected provider, source audio position, backlog in
+seconds, and Whisper / speaker-identification processing times.
 
 Examples:
 ```bash

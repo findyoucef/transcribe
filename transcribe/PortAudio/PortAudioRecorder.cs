@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -12,7 +11,8 @@ namespace Transcribe.PortAudio
         private readonly int targetSampleRate;
         private readonly int targetChannels;
         private readonly bool isLoopback;
-        private readonly BlockingCollection<byte[]> audioChunks = new();
+        private AudioSpool? audioChunks;
+        private readonly string? recordingPath;
         private bool isRecording;
         private CancellationTokenSource? cts;
         private Task? captureTask;
@@ -22,12 +22,13 @@ namespace Transcribe.PortAudio
         private int actualChannels;
         private bool needsResample;
 
-        public PortAudioRecorder(int deviceIndex, int sampleRate = 16000, int channels = 1, bool isLoopback = false)
+        public PortAudioRecorder(int deviceIndex, int sampleRate = 16000, int channels = 1, bool isLoopback = false, string? recordingPath = null)
         {
             this.deviceIndex = deviceIndex;
             targetSampleRate = sampleRate;
             targetChannels = channels;
             this.isLoopback = isLoopback;
+            this.recordingPath = recordingPath;
             actualSampleRate = sampleRate;
             actualChannels = channels;
 
@@ -39,6 +40,7 @@ namespace Transcribe.PortAudio
         }
 
         public bool IsMicrophone => !isLoopback;
+        public TimeSpan? Backlog => audioChunks?.Backlog;
 
         internal static uint GetMacInputDeviceId(int deviceIndex)
         {
@@ -186,6 +188,8 @@ namespace Transcribe.PortAudio
             }
 
             isRecording = true;
+            try { audioChunks = new AudioSpool(recordingPath, new WaveFormat(actualSampleRate, 16, actualChannels)); }
+            catch { PortAudioNative.Pa_StopStream(stream); PortAudioNative.Pa_CloseStream(stream); stream = IntPtr.Zero; isRecording = false; throw; }
             cts = new CancellationTokenSource();
             captureTask = Task.Run(() => CaptureLoop(cts.Token));
         }
@@ -197,6 +201,7 @@ namespace Transcribe.PortAudio
             int bufferSize = framesPerRead * frameSize;
             var buffer = new byte[bufferSize];
 
+            Exception? failure = null;
             try
             {
                 while (!token.IsCancellationRequested && stream != IntPtr.Zero)
@@ -207,22 +212,23 @@ namespace Transcribe.PortAudio
                         // Copy buffer to yield
                         var chunk = new byte[bufferSize];
                         Array.Copy(buffer, chunk, bufferSize);
-                        audioChunks.Add(chunk);
+                        audioChunks!.Write(chunk);
                         
                         // Calculate level
                         currentLevel = AudioUtils.CalculateMaxLevel(chunk);
                     }
                     else
                     {
-                        // Handle error or break?
-                        // For now we just yield empty? No, better to log/ignore
+                        if (!token.IsCancellationRequested)
+                            throw new IOException($"Microphone capture failed: {err}");
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore
+                failure = ex;
             }
+            finally { audioChunks!.Complete(failure); }
         }
 
         public void StopRecording()
@@ -230,6 +236,7 @@ namespace Transcribe.PortAudio
             if (!isRecording) return;
 
             cts?.Cancel();
+            if (stream != IntPtr.Zero) PortAudioNative.Pa_AbortStream(stream);
             captureTask?.Wait();
 
             if (stream != IntPtr.Zero)
@@ -240,12 +247,12 @@ namespace Transcribe.PortAudio
             }
 
             isRecording = false;
-            audioChunks.CompleteAdding();
+            audioChunks?.Complete();
         }
 
         public IEnumerable<byte[]> GetAudioChunks()
         {
-            return audioChunks.GetConsumingEnumerable();
+            return audioChunks?.ReadChunks() ?? Enumerable.Empty<byte[]>();
         }
 
         public float GetCurrentAudioLevel()
@@ -323,6 +330,7 @@ namespace Transcribe.PortAudio
         {
             if (disposed) return;
             StopRecording();
+            audioChunks?.Dispose();
             PortAudioNative.Pa_Terminate();
             disposed = true;
         }

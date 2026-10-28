@@ -22,6 +22,7 @@ public sealed class MainViewModel : ObservableObject
     private WhisperStreamProcessor? speakerProcessor;
     private WhisperStreamProcessor? micProcessor;
     private TranscriptionMerger? merger;
+    private bool isStopping;
 
     private DateTimeOffset? startedAt;
     private string? transcriptPath;
@@ -1240,6 +1241,8 @@ public sealed class MainViewModel : ObservableObject
     {
         var micIndex = SelectedMicDevice?.Index ?? -1;
         transcriptPath = ResolveTranscriptPath();
+        var archive = new RecordingArchive(transcriptPath);
+        var audioPath = archive.CreatePath("MIC");
         LogInfo($"Saving transcript to: {transcriptPath}");
 
         var diarizationOptions = BuildDiarizationOptions();
@@ -1259,7 +1262,7 @@ public sealed class MainViewModel : ObservableObject
                 diarization = new DiarizationPipeline(diarizationModel, diarizationOptions, LogInfo);
             }
 
-            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex);
+            micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex, recordingPath: audioPath);
             micProcessor = new WhisperStreamProcessor(
                 modelPath,
                 language,
@@ -1274,7 +1277,8 @@ public sealed class MainViewModel : ObservableObject
                 diarization: diarization);
 
             micRecorder.StartRecording();
-            micProcessor.StartProcessing();
+            micProcessor.StartProcessing(archive.Started(audioPath, "MIC"));
+            _ = ObserveRecordingAsync(micProcessor);
 
             diarization = null;
         }
@@ -1290,6 +1294,9 @@ public sealed class MainViewModel : ObservableObject
         var micIndex = SelectedMicDevice?.Index ?? -1;
 
         transcriptPath = ResolveTranscriptPath();
+        var archive = new RecordingArchive(transcriptPath);
+        var speakerAudio = archive.CreatePath("SPK");
+        var micAudio = archive.CreatePath("MIC");
         LogInfo($"Saving transcript to: {transcriptPath}");
 
         var diarizationOptions = BuildDiarizationOptions();
@@ -1301,7 +1308,7 @@ public sealed class MainViewModel : ObservableObject
 
         var modelPath = await WhisperClient.EnsureModelDownloaded(SelectedModel, LogInfo);
 
-        speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: speakerIndex);
+        speakerRecorder = AudioCaptureFactory.CreateSpeakerRecorder(deviceIndex: speakerIndex, recordingPath: speakerAudio);
         merger = new TranscriptionMerger(transcriptPath, TimeSpan.FromSeconds(3));
 
         DiarizationPipeline? speakerDiarization = null;
@@ -1331,7 +1338,7 @@ public sealed class MainViewModel : ObservableObject
 
             if (micIndex >= 0)
             {
-                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex, echoCancellation: EchoCancellation);
+                micRecorder = AudioCaptureFactory.CreateMicrophoneRecorder(deviceIndex: micIndex, echoCancellation: EchoCancellation, recordingPath: micAudio);
                 if (diarizationResources != null)
                 {
                     var micModel = new SpeakerEmbeddingModel(diarizationResources.ModelPath, diarizationResources.Config, LogInfo);
@@ -1356,9 +1363,12 @@ public sealed class MainViewModel : ObservableObject
 
             // Voice processing may configure the output device; start it before the tap.
             micRecorder?.StartRecording();
+            var micOffset = micRecorder != null ? archive.Started(micAudio, "MIC") : TimeSpan.Zero;
             speakerRecorder.StartRecording();
-            speakerProcessor.StartProcessing();
-            micProcessor?.StartProcessing();
+            speakerProcessor.StartProcessing(archive.Started(speakerAudio, "SPK"));
+            micProcessor?.StartProcessing(micOffset);
+            _ = ObserveRecordingAsync(speakerProcessor);
+            if (micProcessor != null) _ = ObserveRecordingAsync(micProcessor);
             if (micRecorder != null && EchoCancellation)
                 LogInfo("Microphone echo cancellation enabled (Apple voice processing). Playback ducking is set to minimum.");
 
@@ -1370,12 +1380,29 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-        private async Task StopAsync()
+    private async Task ObserveRecordingAsync(WhisperStreamProcessor processor)
+    {
+        try { await processor.Completion; }
+        catch (Exception ex)
         {
-            if (!IsRunning)
+            await Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                return;
-            }
+                if (!IsRunning || isStopping) return;
+                LogError($"Recording failed: {ex.Message}. Check the log and saved audio backups.");
+                StateText = $"Error: {ex.Message}";
+                OutputTabIndex = LogTabIndex;
+                await StopAsync();
+            });
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        if (!IsRunning || isStopping)
+        {
+            return;
+        }
+        isStopping = true;
 
         // Nothing to stop in file mode; it completes synchronously.
         if (SelectedModeIndex == 0)
@@ -1389,6 +1416,7 @@ public sealed class MainViewModel : ObservableObject
             var isError = StateText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(StateText, "Error", StringComparison.OrdinalIgnoreCase);
             StateText = isError ? StateText : "Idle";
+            isStopping = false;
             return;
         }
 
@@ -1412,14 +1440,14 @@ public sealed class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             LogError($"Stop error: {ex.Message}");
+            StateText = $"Error: {ex.Message}";
         }
         finally
         {
-            merger?.Dispose();
-            merger = null;
-
             micProcessor?.Dispose();
             speakerProcessor?.Dispose();
+            merger?.Dispose();
+            merger = null;
             micRecorder?.Dispose();
             speakerRecorder?.Dispose();
 
@@ -1437,6 +1465,7 @@ public sealed class MainViewModel : ObservableObject
             var isError = StateText.StartsWith("Error:", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(StateText, "Error", StringComparison.OrdinalIgnoreCase);
             StateText = isError ? StateText : "Idle";
+            isStopping = false;
         }
 
         if (SummarizeWithOllama && transcriptPath != null && File.Exists(transcriptPath))

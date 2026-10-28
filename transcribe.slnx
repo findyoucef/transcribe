@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="record-meeting/record-meeting.csproj" />
   <Project Path="transcribe.tests/transcribe.tests.csproj" />
   <Project Path="transcribe/transcribe.csproj" />
   <Project Path="transcribe.gui/transcribe.gui.csproj" />
